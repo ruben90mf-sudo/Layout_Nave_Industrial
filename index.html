@@ -130,7 +130,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 </head>
 <body>
 <header>
-<h1 title="Versión 0.0.0">Layout de taller</h1>
+<h1 title="Versión 0.0.1">Layout de taller</h1>
 <div class="grp" role="group" aria-label="Herramienta">
 <button id="mSel" aria-pressed="true" title="Mover: solo arrastrar, sin cambiar tamaños (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 8-6 2-3 6z"/></svg><span class="lbl">Mover</span><kbd>V</kbd></button>
 <button id="mFree" aria-pressed="false" title="Diseño libre: mover, cambiar tamaño y girar (D)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"/><rect x="3" y="3" width="5" height="5" fill="currentColor" stroke="none"/><rect x="16" y="16" width="5" height="5" fill="currentColor" stroke="none"/></svg><span class="lbl">Diseño</span><kbd>D</kbd></button>
@@ -209,7 +209,7 @@ const $=s=>document.querySelector(s);
 const svg=$('#plan'),wrap=$('#wrap'),pn=$('#pn'),hud=$('#hud'),hint=$('#hint'),ctx=$('#ctx');
 const U={m:{f:1,d:2,l:'m'},cm:{f:100,d:0,l:'cm'},mm:{f:1000,d:0,l:'mm'},ft:{f:3.28084,d:2,l:'ft'}};
 const UN={m:'Metros',cm:'Centímetros',mm:'Milímetros',ft:'Pies'};
-const APP_VERSION='0.0.0';
+const APP_VERSION='0.0.1';
 const KEY='layout-taller-v1';
 const LIGHT={paper:'#fbfcfd',g1:'#e8ecf0',g2:'#cfd6de',wall:'#17202a',muted:'#5b6673',ink:'#17202a',tape:'#e0a800',aisle:'#fbf1cf',acc:'#1d5fd1',panel:'#ffffff',warn:'#d93025',amber:'#c25e00'};
 const VARS={};for(const k in LIGHT)VARS[k]=`var(--${k})`;
@@ -225,7 +225,7 @@ const TYPES=()=>[
 {id:'porton',name:'Portón',color:'#17202a',w:4,h:.25,door:'porton',cl:{f:2,b:0,l:0,r:0}}];
 
 let doc,past=[],future=[],sel=null,mode='select',tab='add',draft=null,meas=null,hov=null,drag=null,pinch=null,before='',fitted=false,pT=0,ctxKey='';
-let flowSel=null;const FCOL=['#d62f7a','#0f8a6c','#e07b00','#5b3fd1','#0d7fb8','#8a5a00'];
+let flowSel=null,userView=false;const FCOL=['#d62f7a','#0f8a6c','#e07b00','#5b3fd1','#0d7fb8','#8a5a00'];
 let free=false;try{free=localStorage.getItem('layout-ui-free')==='1'}catch(e){}
 let CF={bad:new Map(),wc:new Map(),msgs:[]},view={s:20,ox:40,oy:40},ortho=true,draftW=2;
 const ptrs=new Map();
@@ -514,7 +514,7 @@ ctx.style.left=Math.max(8,Math.min(W-cw-60,x))+'px';ctx.style.top=y+'px';
 }
 function fit(){const W=wrap.clientWidth,H=wrap.clientHeight,n=doc.nave,pl=56,pr2=58,pt=W<600?58:64,pb=60;const s=Math.max(.5,Math.min((W-pl-pr2)/n.w,(H-pt-pb)/n.h));view={s,ox:pl+(W-pl-pr2-n.w*s)/2,oy:pt+(H-pt-pb-n.h*s)/2}}
 const clampS=s=>Math.min(3000,Math.max(.5,s));
-function zoomAt(p,k){const s=clampS(view.s*k),wx=(p.x-view.ox)/view.s,wy=(p.y-view.oy)/view.s;view={s,ox:p.x-wx*s,oy:p.y-wy*s};render()}
+function zoomAt(p,k){userView=true;const s=clampS(view.s*k),wx=(p.x-view.ox)/view.s,wy=(p.y-view.oy)/view.s;view={s,ox:p.x-wx*s,oy:p.y-wy*s};render()}
 
 /* modes */
 function setMode(m){mode=m;draft=m==='aisle'?[]:null;if(m!=='measure')meas=null;
@@ -740,11 +740,11 @@ render();
 });
 svg.addEventListener('pointermove',e=>{
 const p=spt(e);if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,p);
-if(pinch&&ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y)||1,m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},v=pinch.v,s=clampS(v.s*d/pinch.d),wx=(pinch.m.x-v.ox)/v.s,wy=(pinch.m.y-v.oy)/v.s;view={s,ox:m.x-wx*s,oy:m.y-wy*s};render();return}
+if(pinch&&ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y)||1,m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},v=pinch.v,s=clampS(v.s*d/pinch.d),wx=(pinch.m.x-v.ox)/v.s,wy=(pinch.m.y-v.oy)/v.s;userView=true;view={s,ox:m.x-wx*s,oy:m.y-wy*s};render();return}
 const w=tw(p);hov=w;
 if(!drag){if(mode!=='select')render();else hudUp();return}
 const k=drag.k;
-if(k==='tap'){if(!drag.moved&&Math.hypot(p.x-drag.p.x,p.y-drag.p.y)>5)drag.moved=true;if(drag.moved)view={...drag.v,ox:drag.v.ox+p.x-drag.p.x,oy:drag.v.oy+p.y-drag.p.y};render();return}
+if(k==='tap'){if(!drag.moved&&Math.hypot(p.x-drag.p.x,p.y-drag.p.y)>5)drag.moved=true;if(drag.moved){userView=true;view={...drag.v,ox:drag.v.ox+p.x-drag.p.x,oy:drag.v.oy+p.y-drag.p.y}}render();return}
 const T=tm();
 if(k==='mv'&&(T[it(sel.id).t]||{}).door){placeDoor(it(sel.id),w.x,w.y)}
 else if(k==='mv'){const o=it(sel.id),t=T[o.t]||{};let nx=w.x+drag.dx,ny=w.y+drag.dy;if(doc.snap){if(t.solid){nx=sn(nx);ny=r6(doc.nave.h-sn(doc.nave.h-ny))}else{const b=aabb({...o,x:nx,y:ny});nx+=sn(b.l)-b.l;const yb=doc.nave.h-b.b;ny+=yb-sn(yb)}}o.x=r6(nx);o.y=r6(ny);if(drag.att)for(const a of drag.att){const q=it(a.id);if(q){q.x=r6(o.x+a.dx);q.y=r6(o.y+a.dy)}}}
@@ -807,7 +807,7 @@ $('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
 $('#bPanel').onclick=()=>{const off=document.body.classList.toggle('nopanel');$('#bPanel').setAttribute('aria-pressed',String(!off))};
 $('#zIn').onclick=()=>zoomAt({x:wrap.clientWidth/2,y:wrap.clientHeight/2},1.25);
 $('#zOut').onclick=()=>zoomAt({x:wrap.clientWidth/2,y:wrap.clientHeight/2},.8);
-$('#zFit').onclick=()=>{fit();render()};
+$('#zFit').onclick=()=>{userView=false;fit();render()};
 hint.addEventListener('click',e=>{const id=e.target.closest('button')?.id;if(id==='dOk')finishDraft();else if(id==='dNo'){setMode('select');queuePanel()}else if(id==='fUndo'){const f=doc.flows.find(x=>x.id===flowSel);if(f&&f.steps.length)mut(()=>f.steps.pop());hintUp()}});
 hint.addEventListener('change',e=>{if(e.target.id==='dw'){const v=pr(e.target.value);if(v>0)draftW=r6(v);e.target.value=fN(draftW);render()}else if(e.target.id==='dor')ortho=e.target.checked});
 const fMsg=t=>$('#fMsg').textContent=t;
@@ -912,7 +912,7 @@ try{window.claude?.hot?.snapshot?.(()=>doc)}catch(er){}
 if(wrap.clientWidth>0){fit();fitted=true}
 setMode('select');panel();initSync();
 }
-const ro=new ResizeObserver(()=>{if(!doc)return;if(!fitted&&wrap.clientWidth>0){fit();fitted=true}render()});ro.observe(wrap);
+const ro=new ResizeObserver(()=>{if(!doc)return;if((!fitted||!userView)&&wrap.clientWidth>0){fit();fitted=true}render()});ro.observe(wrap);
 const hot=window.claude&&window.claude.hot;
 if(hot&&hot.ready)hot.ready(start);else start(hot&&hot.data||{});
 }

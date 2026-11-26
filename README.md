@@ -1,6 +1,6 @@
 # Layout de nave industrial
 
-**Versión 0.0.0** · App: https://ruben90mf-sudo.github.io/Layout_Nave_Industrial/
+**Versión 0.0.1** · App: https://ruben90mf-sudo.github.io/Layout_Nave_Industrial/
 
 Programa para organizar el layout de una nave industrial o un taller, a escala. Funciona en el navegador del PC, en tablets Android y en el móvil, y se puede instalar como app.
 
@@ -45,6 +45,9 @@ Sin iniciar sesión, cada dispositivo guarda su propio plano. Para pasarlo a otr
 | `icon-*.png`, `favicon.png`, `apple-touch-icon.png` | Iconos |
 
 ## Versiones
+
+### 0.0.1 (26/11/2026)
+- Corregido: el plano se ajusta solo al tamaño de la ventana mientras no se haya hecho zoom (antes podía salir diminuto al abrir la app en una ventana pequeña).
 
 ### 0.0.0 (26/11/2026)
 Primera versión estable:
