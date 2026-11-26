@@ -59,6 +59,7 @@ h3{font:700 15px/1.2 Barlow,sans-serif;margin:0 0 10px}
 .kind{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:8px}
 .f{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 label{display:grid;gap:3px;font-size:13px;color:var(--muted)}
+input:disabled,button:disabled{opacity:.55;cursor:not-allowed}
 input,select,textarea{font:16px Barlow,sans-serif;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 9px;width:100%}
 .ig{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:7px;background:var(--paper)}
 .ig:focus-within{outline:2px solid var(--acc);outline-offset:1px}
@@ -90,6 +91,7 @@ input[type=color]{padding:2px;height:40px}
 #chips{position:absolute;left:10px;top:10px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 20px)}
 #chips button{min-height:34px;padding:0 10px;font-size:14px;border-radius:17px;background:color-mix(in srgb,var(--panel) 92%,transparent)}
 #chips button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+#chips button[data-v=lockAll][aria-pressed=true]{background:var(--warn);border-color:var(--warn);color:#fff}
 #hud{position:absolute;left:10px;bottom:10px;font:600 14px 'Barlow Condensed',sans-serif;color:var(--muted);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:3px 8px;border-radius:6px;pointer-events:none;white-space:nowrap}
 #zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:4px}
 #zoom button{width:42px;justify-content:center;padding:0;font-size:20px}
@@ -143,6 +145,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 <button data-v="snap" title="Ajustar a la cuadrícula al mover">Imán</button>
 <button data-v="dims" title="Cotas y ejes">Cotas</button>
 <button data-v="showCl" title="Espacios de trabajo alrededor de las máquinas">Espacios</button>
+<button data-v="lockAll" title="Fijar todo el plano para que no se mueva nada por error">Fijar todo</button>
 </div>
 <div id="hint"></div>
 <div id="ctx" hidden></div>
@@ -227,6 +230,7 @@ const it=id=>doc.items.find(o=>o.id===id);
 const ai=id=>doc.aisles.find(a=>a.id===id);
 const sn=v=>doc.snap?r6(Math.round(v/doc.grid)*doc.grid):Math.round(v*1000)/1000;
 const upY=y=>r6(doc.nave.h-y);
+const LK=o=>!!(o&&(o.lock||doc.lockAll));
 const hasCl=o=>o.cl&&(o.cl.f||o.cl.b||o.cl.l||o.cl.r);
 
 function sample(){
@@ -251,6 +255,7 @@ function normalize(d){
 d.unit=U[d.unit]?d.unit:'m';d.grid=+d.grid>0?+d.grid:.1;
 d.nave={w:+d.nave.w>0?+d.nave.w:30,h:+d.nave.h>0?+d.nave.h:18};
 for(const k of ['snap','showGrid','dims','showCl'])if(typeof d[k]!=='boolean')d[k]=true;
+d.lockAll=!!d.lockAll;
 for(const bt of TYPES())if(['sala','puerta','porton'].includes(bt.id)&&!d.types.some(t=>t&&t.id===bt.id))d.types.push(bt);
 d.types=d.types.filter(t=>t&&t.id).map(t=>({...t,id:String(t.id),name:String(t.name||'Tipo'),color:/^#[0-9a-f]{6}$/i.test(t.color)?t.color:'#6b7280',w:+t.w>0?+t.w:1,h:+t.h>0?+t.h:1,cl:ncl(t.cl)}));
 d.items=d.items.filter(o=>o&&isFinite(o.x)&&isFinite(o.y)&&+o.w>0&&+o.h>0).map(o=>({...o,id:String(o.id||uid()),t:String(o.t),name:String(o.name||''),x:+o.x,y:+o.y,w:+o.w,h:+o.h,r:+o.r||0,cl:ncl(o.cl)}));
@@ -326,7 +331,7 @@ text{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:600;pa
 .ae{stroke:${c.tape};fill:none}.af{stroke:${c.aisle};fill:none}.am{stroke:${c.tape};stroke-dasharray:8 6;fill:none;stroke-width:1}.at{fill:${c.ink};font-size:12px;stroke:${c.aisle}}
 .cota{stroke:${c.acc};stroke-width:1;fill:none}.ct{fill:${c.acc};font-size:12px}.sel{fill:none;stroke:${c.acc};stroke-width:1.5;stroke-dasharray:5 4}
 .hd{fill:${c.panel};stroke:${c.acc};stroke-width:1.5}.hm{fill:${c.acc};opacity:.55}.wn{fill:none;stroke:${c.warn};stroke-width:2.5;stroke-dasharray:5 3}.wc{stroke:${c.amber};stroke-width:2;stroke-dasharray:6 3}
-.org{fill:${c.acc}}.dr{stroke:${c.ink};stroke-width:1.5;fill:none}.dl{fill:${c.ink};font-size:12px}.ms{stroke:${c.warn};stroke-width:1.5;fill:none}.mt{fill:${c.warn};font-size:14px}`}
+.org{fill:${c.acc}}.lk rect{fill:${c.ink}}.lk path{fill:none;stroke:${c.paper};stroke-width:1.6}.dr{stroke:${c.ink};stroke-width:1.5;fill:none}.dl{fill:${c.ink};font-size:12px}.ms{stroke:${c.warn};stroke-width:1.5;fill:none}.mt{fill:${c.warn};font-size:14px}`}
 function dimH(a,b,y,t,cl='dim',tc='dt'){return `<path class="${cl}" d="M${r1(a)} ${r1(y)}H${r1(b)}M${r1(a)} ${r1(y-5)}v10M${r1(b)} ${r1(y-5)}v10"/>`+(Math.abs(b-a)>t.length*6+6?`<text class="${tc}" x="${r1((a+b)/2)}" y="${r1(y-5)}" text-anchor="middle">${esc(t)}</text>`:'')}
 function dimV(a,b,x,t,cl='dim',tc='dt'){return `<path class="${cl}" d="M${r1(x)} ${r1(a)}V${r1(b)}M${r1(x-5)} ${r1(a)}h10M${r1(x-5)} ${r1(b)}h10"/>`+(Math.abs(b-a)>t.length*6+6?`<text class="${tc}" transform="translate(${r1(x-5)} ${r1((a+b)/2)}) rotate(-90)" text-anchor="middle">${esc(t)}</text>`:'')}
 function majorStep(S,min=24){for(const m of [.5,1,2,5,10,20,50])if(m>=doc.grid*4.99&&m*S>=min)return m;return 100}
@@ -340,7 +345,7 @@ return `<g pointer-events="none" transform="${tf(i,v)}"><rect x="${r1(-w/2-l*S)}
 function itemSvg(i,t,v,exp){
 const S=v.s,w=i.w*S,h=i.h*S,bad=!exp&&CF.bad.has(i.id),isSel=!exp&&sel&&sel.k==='i'&&sel.id===i.id,col=esc(t.color||'#888888');
 const shape=a=>i.round?`<ellipse rx="${r1(w/2)}" ry="${r1(h/2)}" ${a}/>`:`<rect x="${r1(-w/2)}" y="${r1(-h/2)}" width="${r1(w)}" height="${r1(h)}" ${a}/>`;
-let o=`<g data-iid="${esc(i.id)}" transform="${tf(i,v)}" style="cursor:${i.lock?'pointer':'move'}"><title>${esc(i.name)} · ${esc(fN(i.w))} × ${esc(fm(i.h))}</title>`;
+let o=`<g data-iid="${esc(i.id)}" transform="${tf(i,v)}" style="cursor:${LK(i)?'pointer':'move'}"><title>${esc(i.name)} · ${esc(fN(i.w))} × ${esc(fm(i.h))}</title>`;
 if(t.door){const dt=Math.max(7,i.h*S+5),hw=w/2,rr=norm(+i.r||0),fl=rr>90&&rr<=270;
 o+=`<rect class="floor" x="${r1(-hw)}" y="${r1(-dt/2)}" width="${r1(w)}" height="${r1(dt)}"/><path class="dr" style="stroke-width:2" d="M${r1(-hw)} ${r1(-dt/2)}v${r1(dt)}M${r1(hw)} ${r1(-dt/2)}v${r1(dt)}"/>`;
 if(t.door==='puerta'){const hx=i.hinge?hw:-hw;o+=`<path class="dr" style="stroke-width:2.2" d="M${r1(hx)} 0v${r1(w)}"/><path class="dr" style="stroke-dasharray:3 3" d="M${r1(hx)} ${r1(w)}A${r1(w)} ${r1(w)} 0 0 ${i.hinge?1:0} ${r1(-hx)} 0"/>`}
@@ -361,7 +366,8 @@ if(tx)o+=`<g pointer-events="none" transform="rotate(${flip?180:0})">${tx}</g>`;
 }
 if(isSel){
 o+=`<rect class="sel" x="${r1(-w/2-4)}" y="${r1(-h/2-4)}" width="${r1(w+8)}" height="${r1(h+8)}" pointer-events="none"/>`;
-if(!i.lock&&!t.door){
+if(LK(i))o+=`<g class="lk" transform="translate(${r1(w/2+4)} ${r1(-h/2-4)})" pointer-events="none"><rect x="-8" y="-9" width="16" height="16" rx="4"/><path d="M-3.5 -1.5v-2.5a3.5 3.5 0 017 0v2.5M-4.5 -1.5h9v6h-9z"/></g>`;
+if(!LK(i)&&!t.door){
 o+=`<line class="sel" x1="0" y1="${r1(-h/2-4)}" x2="0" y2="${r1(-h/2-28)}"/><circle data-rot="1" cx="0" cy="${r1(-h/2-28)}" r="15" fill="transparent" style="cursor:grab"/><circle class="hd" cx="0" cy="${r1(-h/2-28)}" r="7" pointer-events="none"/>`;
 for(const hx of [-1,0,1])for(const hy of [-1,0,1]){if(!hx&&!hy)continue;const x=hx*(w/2+4),y=hy*(h/2+4);o+=`<rect data-h="${hx},${hy}" x="${r1(x-12)}" y="${r1(y-12)}" width="24" height="24" fill="transparent" style="cursor:crosshair"/><rect class="hd" x="${r1(x-5)}" y="${r1(y-5)}" width="10" height="10" pointer-events="none"/>`}
 }}
@@ -369,7 +375,7 @@ return o+'</g>';
 }
 function aisleSvg(a,v,exp){
 const S=v.s,P=a.pts.map(([x,y])=>[r1(x*S+v.ox),r1(y*S+v.oy)]),ps=P.map(p=>p.join(',')).join(' '),w=a.w*S,isSel=!exp&&sel&&sel.k==='a'&&sel.id===a.id,sg=segs(a);
-let o=`<g data-aid="${esc(a.id)}" style="cursor:${a.lock?'pointer':'move'}"><title>${esc(a.name)} · ancho ${esc(fm(a.w))}</title><polyline class="ae" points="${ps}" stroke-width="${r1(w+4)}" stroke-linejoin="miter" stroke-miterlimit="10"/><polyline class="af" points="${ps}" stroke-width="${r1(Math.max(w-2,1))}" stroke-linejoin="miter" stroke-miterlimit="10"/><polyline class="am" points="${ps}"/>`;
+let o=`<g data-aid="${esc(a.id)}" style="cursor:${LK(a)?'pointer':'move'}"><title>${esc(a.name)} · ancho ${esc(fm(a.w))}</title><polyline class="ae" points="${ps}" stroke-width="${r1(w+4)}" stroke-linejoin="miter" stroke-miterlimit="10"/><polyline class="af" points="${ps}" stroke-width="${r1(Math.max(w-2,1))}" stroke-linejoin="miter" stroke-miterlimit="10"/><polyline class="am" points="${ps}"/>`;
 const others=[];for(const b of doc.aisles)segs(b).forEach((s,j)=>{if(s.L>1e-9)others.push({R:segRect(s,b.w+.2),own:b===a,j})});
 let li=0;sg.forEach((s,i)=>{if(s.L>sg[li].L)li=i});
 sg.forEach((s,i)=>{let txt=i===li?`${a.name} · ${fm(s.L)} × ${fm(a.w)}`:fm(s.L);if(txt.length*6.2>s.L*S-12)txt=fm(s.L);if(txt.length*6.2>s.L*S-12)return;
@@ -378,7 +384,7 @@ for(const t of [.5,.32,.68,.2,.8]){const cx=s.x1+(s.x2-s.x1)*t,cy=s.y1+(s.y2-s.y
 if(!pos)return;let ang=s.ang;if(ang>90)ang-=180;if(ang<=-90)ang+=180;
 o+=`<text class="at" pointer-events="none" transform="translate(${r1(pos[0]*S+v.ox)} ${r1(pos[1]*S+v.oy)}) rotate(${r1(ang)})" y="4" text-anchor="middle">${esc(txt)}</text>`});
 o+=`<polyline points="${ps}" fill="none" stroke="transparent" stroke-width="${r1(Math.max(w,16))}" stroke-linejoin="miter"/></g>`;
-if(isSel){o+=`<polyline class="sel" points="${ps}" pointer-events="none"/>`;if(!a.lock){for(let i=0;i<P.length-1;i++)o+=`<circle class="hm" data-ins="${i}" cx="${r1((P[i][0]+P[i+1][0])/2)}" cy="${r1((P[i][1]+P[i+1][1])/2)}" r="6" style="cursor:copy"/>`;P.forEach((p,i)=>o+=`<circle data-v="${i}" cx="${p[0]}" cy="${p[1]}" r="14" fill="transparent" style="cursor:crosshair"/><circle class="hd" cx="${p[0]}" cy="${p[1]}" r="6" pointer-events="none"/>`)}}
+if(isSel){o+=`<polyline class="sel" points="${ps}" pointer-events="none"/>`;if(!LK(a)){for(let i=0;i<P.length-1;i++)o+=`<circle class="hm" data-ins="${i}" cx="${r1((P[i][0]+P[i+1][0])/2)}" cy="${r1((P[i][1]+P[i+1][1])/2)}" r="6" style="cursor:copy"/>`;P.forEach((p,i)=>o+=`<circle data-v="${i}" cx="${p[0]}" cy="${p[1]}" r="14" fill="transparent" style="cursor:crosshair"/><circle class="hd" cx="${p[0]}" cy="${p[1]}" r="6" pointer-events="none"/>`)}}
 return o;
 }
 function nearCotas(s,X,Y){
@@ -463,13 +469,13 @@ function hudUp(){hud.textContent=hov?`X ${fN(hov.x)}   Y ${fN(upY(hov.y))} ${un(
 function ctxUp(){
 const o=sel&&(sel.k==='i'?it(sel.id):ai(sel.id));
 if(!o||mode!=='select'||(drag&&drag.k!=='tap')){ctx.hidden=true;return}
-const key=sel.k+sel.id+!!o.lock;
-if(key!==ctxKey){ctxKey=key;ctx.innerHTML=(sel.k==='i'&&!o.lock&&tOf(o).door?`<button data-c="flip">Invertir apertura</button>`:'')+(sel.k==='i'&&!o.lock&&!tOf(o).door?`<button data-c="rl" title="Girar 90° a la izquierda" aria-label="Girar 90 grados a la izquierda">↺</button><button data-c="rr" title="Girar 90° a la derecha" aria-label="Girar 90 grados a la derecha">↻</button>`:'')+`<button data-c="dup">Duplicar</button><button data-c="lock">${o.lock?'Desbloquear':'Bloquear'}</button><button data-c="del" class="dng">Eliminar</button>`}
+const key=sel.k+sel.id+LK(o)+!!doc.lockAll;
+if(key!==ctxKey){ctxKey=key;ctx.innerHTML=doc.lockAll?`<button data-c="unall">Plano fijado · Desbloquear todo</button>`:(sel.k==='i'&&!LK(o)&&tOf(o).door?`<button data-c="flip">Invertir apertura</button>`:'')+(sel.k==='i'&&!LK(o)&&!tOf(o).door?`<button data-c="rl" title="Girar 90° a la izquierda" aria-label="Girar 90 grados a la izquierda">↺</button><button data-c="rr" title="Girar 90° a la derecha" aria-label="Girar 90 grados a la derecha">↻</button>`:'')+`<button data-c="dup">Duplicar</button><button data-c="lock">${o.lock?'Desbloquear':'Bloquear'}</button>${LK(o)?'':'<button data-c="del" class="dng">Eliminar</button>'}`}
 ctx.hidden=false;
 let bx;if(sel.k==='i'){const P=corners(o).map(([x,y])=>[x*view.s+view.ox,y*view.s+view.oy]);bx={l:Math.min(...P.map(p=>p[0])),r:Math.max(...P.map(p=>p[0])),t:Math.min(...P.map(p=>p[1])),b:Math.max(...P.map(p=>p[1]))}}
 else{const P=o.pts.map(([x,y])=>[x*view.s+view.ox,y*view.s+view.oy]),hw=o.w*view.s/2;bx={l:Math.min(...P.map(p=>p[0]))-hw,r:Math.max(...P.map(p=>p[0]))+hw,t:Math.min(...P.map(p=>p[1]))-hw,b:Math.max(...P.map(p=>p[1]))+hw}}
 const W=wrap.clientWidth,H=wrap.clientHeight,cw=ctx.offsetWidth,ch=ctx.offsetHeight;
-let x=(bx.l+bx.r)/2-cw/2,y=bx.t-ch-(sel.k==='i'&&!o.lock&&!tOf(o).door?44:12);
+let x=(bx.l+bx.r)/2-cw/2,y=bx.t-ch-(sel.k==='i'&&!LK(o)&&!tOf(o).door?44:12);
 if(y<54)y=bx.b+14;if(y+ch>H-8)y=Math.max(54,Math.min(H-ch-8,bx.t-ch-12));
 if(W<600){x=8;y=H-ch-10}
 ctx.style.left=Math.max(8,Math.min(W-cw-60,x))+'px';ctx.style.top=y+'px';
@@ -498,14 +504,14 @@ if(t.cl)o.cl={...t.cl};
 if(t.solid){o.x=sn(c.x);o.y=sn(c.y)}else{o.x=r6(sn(c.x-t.w/2)+t.w/2);o.y=r6(sn(c.y-t.h/2)+t.h/2)}
 if(t.door)placeDoor(o,c.x,c.y);
 mut(()=>{doc.items.push(o);sel={k:'i',id:o.id};tab='props'})}
-function del(){if(!sel)return;mut(()=>{if(sel.k==='i')doc.items=doc.items.filter(o=>o.id!==sel.id);else doc.aisles=doc.aisles.filter(a=>a.id!==sel.id);sel=null})}
+function del(){if(!sel)return;if(LK(sel.k==='i'?it(sel.id):ai(sel.id))){toast(doc.lockAll?'El plano está fijado. Desbloquéalo para borrar.':'Está bloqueado. Desbloquéalo para borrarlo.');return}mut(()=>{if(sel.k==='i')doc.items=doc.items.filter(o=>o.id!==sel.id);else doc.aisles=doc.aisles.filter(a=>a.id!==sel.id);sel=null})}
 function dup(){if(!sel)return;const d=Math.max(doc.snap?doc.grid:0,.5);
 if(sel.k==='i'){const o=it(sel.id),c={...clone(o),id:uid(),name:o.name+' (copia)',x:r6(o.x+d),y:r6(o.y-d),lock:false};if(tOf(o).door){const b=nearestSeg(o.x,o.y);if(b)placeDoor(c,o.x,o.y,b.t+o.w/2+.5)}mut(()=>{doc.items.push(c);sel={k:'i',id:c.id}})}
 else{const a=ai(sel.id),c={...clone(a),id:uid(),name:a.name+' (copia)',lock:false,pts:a.pts.map(q=>[r6(q[0]+d),r6(q[1]-d)])};mut(()=>{doc.aisles.push(c);sel={k:'a',id:c.id}})}}
-function rotBy(d){const o=sel&&sel.k==='i'&&it(sel.id);if(!o||o.lock)return;if(tOf(o).door){flipDoor();return}mut(()=>{o.r=norm((o.r||0)+d)})}
+function rotBy(d){const o=sel&&sel.k==='i'&&it(sel.id);if(!o||LK(o))return;if(tOf(o).door){flipDoor();return}mut(()=>{o.r=norm((o.r||0)+d)})}
 function flipDoor(){const o=sel&&it(sel.id);if(o&&tOf(o).door)mut(()=>{o.out=!o.out;placeDoor(o,o.x,o.y,(nearestSeg(o.x,o.y)||{t:o.w/2}).t-o.w/2)})}
 function toggleLock(){const o=sel&&(sel.k==='i'?it(sel.id):ai(sel.id));if(o)mut(()=>{o.lock=!o.lock})}
-function nudge(dx,dy){mut(()=>{if(sel.k==='i'){const o=it(sel.id);if(o.lock)return;if(tOf(o).door){const b=nearestSeg(o.x,o.y);if(b){const st=dx*b.ux+dy*b.uy||dx+dy;placeDoor(o,o.x,o.y,b.t-o.w/2+st)}return}o.x=r6(o.x+dx);o.y=r6(o.y+dy)}else{const a=ai(sel.id);if(a.lock)return;a.pts.forEach(q=>{q[0]=r6(q[0]+dx);q[1]=r6(q[1]+dy)})}})}
+function nudge(dx,dy){mut(()=>{if(sel.k==='i'){const o=it(sel.id);if(LK(o))return;if(tOf(o).door){const b=nearestSeg(o.x,o.y);if(b){const st=dx*b.ux+dy*b.uy||dx+dy;placeDoor(o,o.x,o.y,b.t-o.w/2+st)}return}o.x=r6(o.x+dx);o.y=r6(o.y+dy)}else{const a=ai(sel.id);if(LK(a))return;a.pts.forEach(q=>{q[0]=r6(q[0]+dx);q[1]=r6(q[1]+dy)})}})}
 function genPillars(){
 const sx=pr($('#g_sx').value),sy=pr($('#g_sy').value),sz=pr($('#g_sz').value),inn=$('#g_in').checked,rep=$('#g_rep').checked;if(!(sx>0&&sy>0&&sz>0))return;
 const n=doc.nave,axis=(L,s)=>{const r=[];for(let i=0;i*s<=L+1e-6;i++)r.push(r6(i*s));if(L-r[r.length-1]>.01)r.push(L);return r};
@@ -524,17 +530,18 @@ else if(a==='clZero'){const o=it(sel.id);if(o)mut(()=>{delete o.cl})}
 }
 
 /* panel */
-const nf=(id,label,attr,val,unit)=>`<label for="${id}">${label}<span class="ig"><input id="${id}" ${attr} inputmode="decimal" value="${val}"><span>${unit===undefined?un().l:unit}</span></span></label>`;
+let NFD='';
+const nf=(id,label,attr,val,unit)=>`<label for="${id}">${label}<span class="ig"><input id="${id}" ${attr}${NFD} inputmode="decimal" value="${val}"><span>${unit===undefined?un().l:unit}</span></span></label>`;
 function warnFor(id){const m=CF.msgs.filter(x=>x.id===id);return m.length?`<ul class="lst">${m.map(x=>`<li><button class="${x.lv}" data-sel="i:${esc(x.id)}">${esc(x.txt)}</button></li>`).join('')}</ul>`:''}
 function pAdd(){const u=un().l;return `<h2>Añadir elemento</h2><p class="note" style="margin-top:0">Aparece en el centro de la vista, listo para arrastrarlo a su sitio.</p><div class="addg">${doc.types.map(t=>`<button data-add="${esc(t.id)}"><span class="row" style="gap:6px;flex-wrap:nowrap"><span class="sw" style="background:${esc(t.color)}"></span><b>${esc(t.name)}</b></span><span class="note" style="margin:0">${fN(t.w)} × ${fN(t.h)} ${u}${t.cl&&(t.cl.f||t.cl.b||t.cl.l||t.cl.r)?' · con espacio':''}</span></button>`).join('')}
 <button data-act="aisle"><span class="row" style="gap:6px"><span class="sw" style="background:var(--tape)"></span><b>Pasillo</b></span><span class="note" style="margin:0">Dibujar con líneas</span></button></div>
-<div class="sec"><h3>Cómo se usa</h3><ul class="note"><li>Cuadrados de las esquinas: cambiar tamaño. Círculo de arriba: girar.</li><li>Si hay varias cosas una encima de otra (por ejemplo, una máquina dentro de una zona), toca otra vez en el mismo sitio para seleccionar la de debajo.</li><li>Un elemento bloqueado no se mueve: desbloquéalo en la barra que aparece al seleccionarlo.</li><li>La línea gruesa marca el frente de trabajo; el rectángulo discontinuo es el espacio de trabajo.</li><li>Al seleccionar, las cotas azules dan la distancia libre hasta lo más cercano (otro elemento, un pasillo o la pared).</li><li>Puertas y portones se pegan a la pared más cercana, de la nave o de una sala.</li><li>Las salas (almacén de tornillería, EPIs…) tienen paredes y quedan fuera del espacio de trabajo del taller.</li><li>El origen (0, 0) es la esquina inferior izquierda.</li></ul></div>
+<div class="sec"><h3>Cómo se usa</h3><ul class="note"><li>Cuadrados de las esquinas: cambiar tamaño. Círculo de arriba: girar.</li><li>Si hay varias cosas una encima de otra (por ejemplo, una máquina dentro de una zona), toca otra vez en el mismo sitio para seleccionar la de debajo.</li><li>Para que nada se mueva por error: botón <b>Fijar todo</b> sobre el plano, o fija por tipo (pilares, salas, puertas…) en la pestaña <b>Nave</b>. También puedes bloquear un elemento suelto desde la barra que aparece al seleccionarlo. Lo bloqueado lleva un candado.</li><li>La línea gruesa marca el frente de trabajo; el rectángulo discontinuo es el espacio de trabajo.</li><li>Al seleccionar, las cotas azules dan la distancia libre hasta lo más cercano (otro elemento, un pasillo o la pared).</li><li>Puertas y portones se pegan a la pared más cercana, de la nave o de una sala.</li><li>Las salas (almacén de tornillería, EPIs…) tienen paredes y quedan fuera del espacio de trabajo del taller.</li><li>El origen (0, 0) es la esquina inferior izquierda.</li></ul></div>
 <div class="sec"><h3>Atajos de teclado</h3><ul class="note"><li>Flechas: mover (con Mayús, ×10)</li><li>R: girar 90° · Supr: borrar · Ctrl+D: duplicar</li><li>Ctrl+Z / Ctrl+Y: deshacer / rehacer</li><li>V: mover · P: pasillo · M: medir · Esc: salir</li></ul></div>`}
 const clSvgIcon=`<svg viewBox="0 0 100 74" aria-hidden="true"><rect x="3" y="3" width="94" height="62" rx="3" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".6"/><rect x="24" y="18" width="52" height="30" rx="2" fill="color-mix(in srgb,var(--acc) 18%,transparent)" stroke="var(--acc)" stroke-width="1.5"/><path d="M38 44.5h24" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="62" r="4" fill="var(--ink)"/><path d="M50 57v-4" stroke="var(--ink)" stroke-width="1.5"/></svg>`;
 function pProps(){
 if(!sel)return `<h2>Propiedades</h2><p class="note">Toca un elemento o un pasillo en el plano para ver y cambiar sus medidas.</p>`;
 const u=un().l;
-if(sel.k==='i'&&tOf(it(sel.id)).door){const o=it(sel.id),t=tOf(o),b=nearestSeg(o.x,o.y),on=b&&b.d<.05,al=on?b.t-o.w/2:0,hz=on&&Math.abs(b.uy)<1e-9,vt=on&&Math.abs(b.ux)<1e-9,where=on?(b.s.room?'pared de '+(it(b.s.room)||{}).name:hz?(b.s.y1<1e-6?'pared superior':'pared inferior'):vt?(b.s.x1<1e-6?'pared izquierda':'pared derecha'):'pared'):'';
+if(sel.k==='i'&&tOf(it(sel.id)).door){NFD=LK(it(sel.id))?' disabled':'';const o=it(sel.id),t=tOf(o),b=nearestSeg(o.x,o.y),on=b&&b.d<.05,al=on?b.t-o.w/2:0,hz=on&&Math.abs(b.uy)<1e-9,vt=on&&Math.abs(b.ux)<1e-9,where=on?(b.s.room?'pared de '+(it(b.s.room)||{}).name:hz?(b.s.y1<1e-6?'pared superior':'pared inferior'):vt?(b.s.x1<1e-6?'pared izquierda':'pared derecha'):'pared'):'';
 return `<div class="kind"><span class="sw" style="background:${esc(t.color||'#17202a')}"></span>${esc(t.name||'Puerta')}${on?' · '+esc(where):' · fuera de pared'}${o.lock?' · bloqueada':''}</div>
 <label for="p_name" style="margin-bottom:12px">Nombre<input id="p_name" data-f="name" value="${esc(o.name)}" style="font-weight:600"></label>
 <div class="f">${nf('p_w','Ancho del hueco','data-f="w"',fN(o.w))}${nf('p_al',hz?'Desde la esquina izq.':vt?'Desde la esquina inf.':'Desde el inicio','data-f="along"',fN(al))}
@@ -545,14 +552,14 @@ ${t.door==='puerta'?`<label class="chk full"><input type="checkbox" id="p_hinge"
 <p class="note">Arrástrala por el plano: se pega a la pared más cercana, de la nave o de una sala. Las cotas azules dan la distancia a cada esquina de esa pared. El espacio de paso es la zona que debe quedar libre delante, del lado hacia el que abre; si algo la ocupa, sale un aviso naranja.</p>
 ${CF.msgs.some(x=>x.id===o.id||x.txt.includes(o.name))?`<div class="sec"><h3>Avisos</h3><ul class="lst">${CF.msgs.filter(x=>x.id===o.id||x.txt.endsWith(o.name)).map(x=>`<li><button class="${x.lv}" data-sel="i:${esc(x.id)}">${esc(x.txt)}</button></li>`).join('')}</ul></div>`:''}
 <div class="row" style="margin-top:14px"><button data-act="dup">Duplicar</button><button data-act="del" class="dng">Eliminar</button></div>`}
-if(sel.k==='i'){const o=it(sel.id),T=tm(),t=T[o.t]||{},ctr=!!t.solid,b=aabb(o),px=ctr?o.x:b.l,py=ctr?upY(o.y):upY(b.b),c=o.cl||{f:0,b:0,l:0,r:0},cr=clRect(o);
+if(sel.k==='i'){NFD=LK(it(sel.id))?' disabled':'';const o=it(sel.id),T=tm(),t=T[o.t]||{},ctr=!!t.solid,b=aabb(o),px=ctr?o.x:b.l,py=ctr?upY(o.y):upY(b.b),c=o.cl||{f:0,b:0,l:0,r:0},cr=clRect(o);
 return `<div class="kind"><span class="sw" style="background:${esc(t.color||'#888')}"></span>${esc(t.name||'Elemento')}${o.lock?' · bloqueado':''}</div>
 <label for="p_name" class="full" style="margin-bottom:12px">Nombre<input id="p_name" data-f="name" value="${esc(o.name)}" style="font-weight:600"></label>
 <div class="f">
 ${nf('p_w','Ancho','data-f="w"',fN(o.w))}${nf('p_h','Fondo','data-f="h"',fN(o.h))}
 ${nf('p_x',ctr?'X del eje':'X (esquina inf. izq.)','data-f="px"',fN(px))}${nf('p_y',ctr?'Y del eje':'Y (esquina inf. izq.)','data-f="py"',fN(py))}
 ${nf('p_r','Giro (horario)','data-f="r"',+(+o.r||0).toFixed(1),'°')}
-<div class="row" style="align-self:end;flex-wrap:nowrap"><button data-act="rl" aria-label="Girar 90 grados a la izquierda" style="flex:1;justify-content:center">↺ 90°</button><button data-act="rr" aria-label="Girar 90 grados a la derecha" style="flex:1;justify-content:center">↻ 90°</button></div>
+<div class="row" style="align-self:end;flex-wrap:nowrap"><button data-act="rl"${NFD} aria-label="Girar 90 grados a la izquierda" style="flex:1;justify-content:center">↺ 90°</button><button data-act="rr"${NFD} aria-label="Girar 90 grados a la derecha" style="flex:1;justify-content:center">↻ 90°</button></div>
 </div>
 ${t.room?`<div class="sec"><h3>Sala</h3><div class="f">${nf('p_wt','Grosor de pared','data-f="wt"',fN(wtOf(o)))}</div><p class="note">Superficie interior: ${fN(o.w-2*wtOf(o))} × ${fN(o.h-2*wtOf(o))} = ${area((o.w-2*wtOf(o))*(o.h-2*wtOf(o)))}. La sala queda fuera del espacio de trabajo del taller: avisa si una máquina o su espacio de trabajo atraviesan sus paredes. Lo que esté dentro (por ejemplo, estanterías) pertenece a la sala. Para la entrada, añade una puerta y arrástrala a una pared de la sala; al mover la sala, sus puertas la siguen.</p></div>`:''}
 ${!t.zone&&!t.solid&&!t.room?`<div class="sec"><h3>Espacio de trabajo</h3>
@@ -560,21 +567,21 @@ ${!t.zone&&!t.solid&&!t.room?`<div class="sec"><h3>Espacio de trabajo</h3>
 ${nf('c_l','Izquierda','data-c="l"',fN(c.l))}${clSvgIcon}${nf('c_r','Derecha','data-c="r"',fN(c.r))}
 <span></span>${nf('c_f','Delante (frente)','data-c="f"',fN(c.f))}<span></span></div>
 <p class="note">Izquierda y derecha mirando la máquina desde el frente, donde está el operario. ${cr?`Huella total con espacio: ${fN(cr.w)} × ${fN(cr.h)} = ${area(cr.w*cr.h)}.`:'Sin espacio de trabajo.'}</p>
-<div class="row"><button data-act="clType">Aplicar a todas: ${esc(t.name||'')}</button><button data-act="clDef">Valores del tipo</button><button data-act="clZero">Quitar</button></div></div>`:''}
+<div class="row"${LK(o)?' hidden':''}><button data-act="clType">Aplicar a todas: ${esc(t.name||'')}</button><button data-act="clDef">Valores del tipo</button><button data-act="clZero">Quitar</button></div></div>`:''}
 <div class="sec"><h3>Otros</h3>
 <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="p_round" data-f="round" ${o.round?'checked':''}> Forma redonda</label>
 <label class="chk" style="margin-bottom:10px"><input type="checkbox" id="p_lock" data-f="lock" ${o.lock?'checked':''}> Bloquear (no se mueve por error)</label>
 <label for="p_t">Tipo<select id="p_t" data-f="t">${doc.types.map(x=>`<option value="${esc(x.id)}" ${x.id===o.t?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
 <label for="p_notes" style="margin-top:10px">Notas<textarea id="p_notes" data-f="notes" rows="2">${esc(o.notes||'')}</textarea></label>
-<p class="note">Superficie: ${fN(o.w)} × ${fN(o.h)} = ${area(o.w*o.h)}. ${ctr?'La posición se mide al eje (centro) del pilar desde la esquina inferior izquierda.':'La posición es la esquina inferior izquierda del elemento, medida desde el origen.'}</p></div>
+${LK(o)?`<p class="note" style="color:var(--ink)"><b>${doc.lockAll?'El plano está fijado.':'Este elemento está bloqueado.'}</b> Las medidas no se pueden cambiar hasta desbloquearlo.</p>`:''}<p class="note">Superficie: ${fN(o.w)} × ${fN(o.h)} = ${area(o.w*o.h)}. ${ctr?'La posición se mide al eje (centro) del pilar desde la esquina inferior izquierda.':'La posición es la esquina inferior izquierda del elemento, medida desde el origen.'}</p></div>
 ${CF.msgs.some(x=>x.id===o.id)?`<div class="sec"><h3>Avisos</h3>${warnFor(o.id)}</div>`:''}
 <div class="row" style="margin-top:14px"><button data-act="dup">Duplicar</button><button data-act="del" class="dng">Eliminar</button></div>`}
-const a=ai(sel.id),sg=segs(a),tot=sg.reduce((s,x)=>s+x.L,0);
+NFD=LK(ai(sel.id))?' disabled':'';const a=ai(sel.id),sg=segs(a),tot=sg.reduce((s,x)=>s+x.L,0);
 const dir=s=>Math.abs(s.y2-s.y1)<1e-6?'horizontal':Math.abs(s.x2-s.x1)<1e-6?'vertical':`${Math.round(norm(-s.ang))}°`;
 return `<div class="kind"><span class="sw" style="background:var(--tape)"></span>Pasillo${a.lock?' · bloqueado':''}</div>
 <label for="a_name" style="margin-bottom:12px">Nombre<input id="a_name" data-a="name" value="${esc(a.name)}" style="font-weight:600"></label>
 <div class="f">${nf('a_w','Ancho','data-a="w"',fN(a.w))}<label class="chk" style="align-self:end;min-height:40px"><input type="checkbox" id="a_lock" data-a="lock" ${a.lock?'checked':''}> Bloquear</label></div>
-<div class="sec"><h3>Tramos</h3><table><tbody>${sg.map((s,i)=>`<tr><td>Tramo ${i+1} <span class="note">${dir(s)}</span></td><td class="n" style="width:120px"><span class="ig"><input id="a_s${i}" data-seg="${i}" inputmode="decimal" value="${fN(s.L)}" aria-label="Longitud del tramo ${i+1}"><span>${u}</span></span></td></tr>`).join('')}<tr><th>Total</th><th class="n">${fm(tot)}</th></tr></tbody></table>
+<div class="sec"><h3>Tramos</h3><table><tbody>${sg.map((s,i)=>`<tr><td>Tramo ${i+1} <span class="note">${dir(s)}</span></td><td class="n" style="width:120px"><span class="ig"><input id="a_s${i}" data-seg="${i}"${NFD} inputmode="decimal" value="${fN(s.L)}" aria-label="Longitud del tramo ${i+1}"><span>${u}</span></span></td></tr>`).join('')}<tr><th>Total</th><th class="n">${fm(tot)}</th></tr></tbody></table>
 <p class="note">Superficie aproximada: ${fm(tot)} × ${fm(a.w)} ≈ ${area(tot*a.w)}. Al cambiar la longitud de un tramo, los siguientes se desplazan. Arrastra los puntos blancos para moverlos; toca los azules del centro para añadir un vértice.</p></div>
 <div class="row" style="margin-top:10px"><button data-act="popPt" ${a.pts.length>2?'':'disabled'}>Quitar último punto</button><button data-act="dup">Duplicar</button><button data-act="del" class="dng">Eliminar</button></div>`;
 }
@@ -596,6 +603,10 @@ ${nf('n_w','Largo (eje X)','data-n="w"',fN(doc.nave.w))}${nf('n_h','Ancho (eje Y
 <label for="n_unit">Unidad<select id="n_unit" data-n="unit">${Object.keys(U).map(k=>`<option value="${k}" ${k===doc.unit?'selected':''}>${UN[k]}</option>`).join('')}</select></label>
 ${nf('n_grid','Cuadrícula','data-n="grid"',fN(doc.grid))}</div>
 <p class="note">Lo que se muestra (rejilla, imán, cotas y espacios) se activa con los botones redondos sobre el plano.</p>
+<div class="sec"><h3>Fijar elementos</h3><p class="note" style="margin-top:0">Lo fijado no se puede mover, girar, cambiar de tamaño ni borrar por error. Se sigue pudiendo seleccionar para ver sus medidas.</p>
+<label class="chk" style="margin-bottom:8px"><input type="checkbox" id="lk_all" data-lkall="1" ${doc.lockAll?'checked':''}> <b>Fijar todo el plano</b></label>
+${doc.types.filter(t=>doc.items.some(o=>o.t===t.id)).map(t=>{const l=doc.items.filter(o=>o.t===t.id),n=l.filter(o=>o.lock).length;return `<label class="chk" style="margin-bottom:6px"><input type="checkbox" id="lk_${esc(t.id)}" data-lt="${esc(t.id)}" ${n===l.length?'checked':''}> <span class="sw" style="background:${esc(t.color)}"></span>${esc(t.name)} <span class="note" style="margin:0">(${n} de ${l.length})</span></label>`}).join('')}
+${doc.aisles.length?`<label class="chk"><input type="checkbox" id="lk___a" data-lt="__a" ${doc.aisles.every(a=>a.lock)?'checked':''}> <span class="sw" style="background:var(--tape)"></span>Pasillos <span class="note" style="margin:0">(${doc.aisles.filter(a=>a.lock).length} de ${doc.aisles.length})</span></label>`:''}</div>
 <div class="sec"><h3>Pilares en malla</h3><div class="f">
 ${nf('g_sx','Separación en X','',fN(6))}${nf('g_sy','Separación en Y','',fN(9))}
 ${nf('g_sz','Sección','',fN(.4))}<label class="chk" style="align-self:end;min-height:40px"><input type="checkbox" id="g_in" checked> Interiores</label>
@@ -608,7 +619,7 @@ ${doc.types.map(t=>{const used=doc.items.some(o=>o.t===t.id),id=esc(t.id);return
 <p class="note">Las dos casillas son el ancho y el fondo por defecto (${u}). El espacio de trabajo por defecto de cada tipo se fija desde una pieza con «Aplicar a todas». Un tipo «Zona» se dibuja rayado, debajo de todo, y no cuenta para los choques.</p></div>`}
 let pKey='';
 function panel(){
-const fid=document.activeElement&&document.activeElement.id,key=tab+(sel?sel.k+sel.id:''),keep=key===pKey,st=pn.scrollTop;pKey=key;
+NFD='';const fid=document.activeElement&&document.activeElement.id,key=tab+(sel?sel.k+sel.id:''),keep=key===pKey,st=pn.scrollTop;pKey=key;
 document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
 pn.innerHTML=tab==='add'?pAdd():tab==='props'?pProps():tab==='list'?pList():pNave();
 if(fid){const el=document.getElementById(fid);if(el&&pn.contains(el))el.focus({preventScroll:true})}
@@ -627,11 +638,13 @@ else if(f==='along'){const q=pr(v);if(q!==null&&q>=0)placeDoor(o,o.x,o.y,q)}
 if(t.door&&(f==='w'||f==='px'||f==='py')){const b=nearestSeg(o.x,o.y);if(b)placeDoor(o,o.x,o.y,b.t-o.w/2)}
 }
 pn.addEventListener('change',e=>{const el=e.target,d=el.dataset,v=el.type==='checkbox'?el.checked:el.value;
-if(d.f&&sel){const o=it(sel.id);if(o)mut(()=>setItem(o,d.f,v))}
-else if(d.c&&sel){const o=it(sel.id),q=pr(v);if(o)mut(()=>{if(q!==null&&q>=0){o.cl=o.cl?{...o.cl}:{f:0,b:0,l:0,r:0};o.cl[d.c]=r6(q)}})}
-else if(d.a&&sel){const a=ai(sel.id);mut(()=>{if(d.a==='name')a.name=v.trim()||a.name;else if(d.a==='w'){const q=pr(v);if(q>0)a.w=r6(q)}else a.lock=!!v})}
-else if(d.seg!==undefined&&sel){const a=ai(sel.id),i=+d.seg,q=pr(v);mut(()=>{const p=a.pts,L=Math.hypot(p[i+1][0]-p[i][0],p[i+1][1]-p[i][1]);if(q>0&&L>0){const dx=(p[i+1][0]-p[i][0])/L*(q-L),dy=(p[i+1][1]-p[i][1])/L*(q-L);for(let j=i+1;j<p.length;j++){p[j][0]=r6(p[j][0]+dx);p[j][1]=r6(p[j][1]+dy)}}})}
+if(d.f&&sel){const o=it(sel.id);if(o&&!(LK(o)&&!['name','notes','lock','t'].includes(d.f)))mut(()=>setItem(o,d.f,v));else queuePanel()}
+else if(d.c&&sel){const o=it(sel.id),q=pr(v);if(o&&!LK(o))mut(()=>{if(q!==null&&q>=0){o.cl=o.cl?{...o.cl}:{f:0,b:0,l:0,r:0};o.cl[d.c]=r6(q)}})}
+else if(d.a&&sel){const a=ai(sel.id);if(LK(a)&&d.a==='w'){queuePanel();return}mut(()=>{if(d.a==='name')a.name=v.trim()||a.name;else if(d.a==='w'){const q=pr(v);if(q>0)a.w=r6(q)}else a.lock=!!v})}
+else if(d.seg!==undefined&&sel){const a=ai(sel.id),i=+d.seg,q=pr(v);if(LK(a)){queuePanel();return}mut(()=>{const p=a.pts,L=Math.hypot(p[i+1][0]-p[i][0],p[i+1][1]-p[i][1]);if(q>0&&L>0){const dx=(p[i+1][0]-p[i][0])/L*(q-L),dy=(p[i+1][1]-p[i][1])/L*(q-L);for(let j=i+1;j<p.length;j++){p[j][0]=r6(p[j][0]+dx);p[j][1]=r6(p[j][1]+dy)}}})}
 else if(d.n){mut(()=>{const k=d.n;if(k==='unit')doc.unit=v;else{const q=pr(v);if(q>0){if(k==='grid')doc.grid=r6(q);else if(k==='w')doc.nave.w=r6(q);else{const dl=q-doc.nave.h;doc.items.forEach(o=>o.y=r6(o.y+dl));doc.aisles.forEach(a=>a.pts.forEach(p=>p[1]=r6(p[1]+dl)));doc.nave.h=r6(q)}}}});if(d.n==='unit')hintUp();if(d.n==='w'||d.n==='h'){fit();render()}}
+else if(d.lkall){doc.lockAll=!!v;save();ctxKey='';render();queuePanel()}
+else if(d.lt){mut(()=>{if(d.lt==='__a')doc.aisles.forEach(a=>a.lock=!!v);else doc.items.forEach(o=>{if(o.t===d.lt)o.lock=!!v})})}
 else if(d.ty){const t=doc.types.find(x=>x.id===d.ty);if(t)mut(()=>{const k=d.k;if(k==='w'||k==='h'){const q=pr(v);if(q>0)t[k]=r6(q)}else if(k==='name')t.name=v.trim()||t.name;else if(k==='color')t.color=v;else t[k]=!!v})}
 });
 pn.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
@@ -641,8 +654,8 @@ else if(b.dataset.deltype)mut(()=>{doc.types=doc.types.filter(t=>t.id!==b.datase
 else if(b.dataset.act)act(b.dataset.act);
 });
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;if(document.body.classList.contains('nopanel')){document.body.classList.remove('nopanel');$('#bPanel').setAttribute('aria-pressed','true')}panel()}});
-ctx.addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;const c=b.dataset.c;if(c==='rl')rotBy(-90);else if(c==='rr')rotBy(90);else if(c==='dup')dup();else if(c==='lock')toggleLock();else if(c==='del')del();else if(c==='flip')flipDoor();ctxKey=''; render()});
-$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;doc[b.dataset.v]=!doc[b.dataset.v];save();render()});
+ctx.addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;const c=b.dataset.c;if(c==='rl')rotBy(-90);else if(c==='rr')rotBy(90);else if(c==='dup')dup();else if(c==='lock')toggleLock();else if(c==='del')del();else if(c==='flip')flipDoor();else if(c==='unall'){doc.lockAll=false;save();queuePanel()}ctxKey=''; render()});
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;const k=b.dataset.v;doc[k]=!doc[k];save();ctxKey='';render();queuePanel();if(k==='lockAll')toast(doc.lockAll?'Plano fijado: nada se puede mover, girar ni borrar.':'Plano desbloqueado.')});
 
 /* pointer */
 const spt=e=>{const r=svg.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}};
@@ -661,10 +674,10 @@ if(d.h&&sel&&sel.k==='i'){const [hx,hy]=d.h.split(',').map(Number);drag={k:'rs',
 else if(d.rot&&sel){drag={k:'rot'}}
 else if(d.v!==undefined&&sel&&sel.k==='a'){drag={k:'vx',i:+d.v}}
 else if(d.ins!==undefined&&sel&&sel.k==='a'){const a=ai(sel.id),i=+d.ins,q=[sn((a.pts[i][0]+a.pts[i+1][0])/2),sn((a.pts[i][1]+a.pts[i+1][1])/2)];a.pts.splice(i+1,0,q);drag={k:'vx',i:i+1}}
-else if(ie){const o=it(ie.dataset.iid),was=!!(sel&&sel.id===o.id);if(!sel||sel.id!==o.id){sel={k:'i',id:o.id};tab='props';panel()}drag=o.lock?{k:'tap',p,v:{...view}}:{k:'mv',dx:o.x-w.x,dy:o.y-w.y};
+else if(ie){const o=it(ie.dataset.iid),was=!!(sel&&sel.id===o.id);if(!sel||sel.id!==o.id){sel={k:'i',id:o.id};tab='props';panel()}drag=LK(o)?{k:'tap',p,v:{...view}}:{k:'mv',dx:o.x-w.x,dy:o.y-w.y};
 Object.assign(drag,{cyc:was,cx:e.clientX,cy:e.clientY});
 if(drag.k==='mv'&&tOf(o).room)drag.att=doc.items.filter(q=>{if(!tOf(q).door)return false;const b=nearestSeg(q.x,q.y);return b&&b.d<.05&&b.s.room===o.id}).map(q=>({id:q.id,dx:q.x-o.x,dy:q.y-o.y}))}
-else if(ae){const a=ai(ae.dataset.aid),was=!!(sel&&sel.id===a.id);if(!sel||sel.id!==a.id){sel={k:'a',id:a.id};tab='props';panel()}drag=a.lock?{k:'tap',p,v:{...view}}:{k:'am',w0:w,p0:a.pts.map(q=>q.slice())};Object.assign(drag,{cyc:was,cx:e.clientX,cy:e.clientY})}
+else if(ae){const a=ai(ae.dataset.aid),was=!!(sel&&sel.id===a.id);if(!sel||sel.id!==a.id){sel={k:'a',id:a.id};tab='props';panel()}drag=LK(a)?{k:'tap',p,v:{...view}}:{k:'am',w0:w,p0:a.pts.map(q=>q.slice())};Object.assign(drag,{cyc:was,cx:e.clientX,cy:e.clientY})}
 else drag={k:'tap',p,v:{...view},clear:true};
 render();
 });
