@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="firebase-config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -104,6 +105,15 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);c
 dialog::backdrop{background:rgb(0 0 0/.45)}
 dialog textarea{height:200px;font:13px/1.4 ui-monospace,Consolas,monospace}
 dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:block}
+#bSync .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+#bSync[data-st=ok] .dot{background:var(--acc)}#bSync[data-st=busy] .dot,#bSync[data-st=cache] .dot{background:var(--amber)}#bSync[data-st=err] .dot{background:var(--warn)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:15px;z-index:10;box-shadow:0 6px 18px rgb(0 0 0/.2);max-width:calc(100% - 32px)}
+#toast[hidden]{display:none}
+.pl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.pl.cur{background:color-mix(in srgb,var(--acc) 8%,transparent);border-radius:8px;padding-inline:8px}
+.pl .nm{font-weight:600}.pl .dt2{font-size:13px;color:var(--muted)}
+.pl .row{justify-content:flex-end}
+.pl button{min-height:36px;padding:0 10px;font-size:14px}
 @media(max-width:760px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 46%}body.nopanel main{grid-template-rows:minmax(0,1fr) auto}body.nopanel aside{display:flex}body.nopanel #pn{display:none}aside{border-left:0;border-top:1px solid var(--line)}.lbl,kbd{display:none}h1{font-size:18px}header button{padding:0 9px}#chips button{min-height:32px;padding:0 9px;font-size:13px}}
 </style>
 </head>
@@ -120,6 +130,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 <button id="bRedo" title="Rehacer (Ctrl+Y)" aria-label="Rehacer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 000 10h3"/></svg></button>
 </div>
 <span class="sp"></span>
+<button id="bSync" data-st="off" title="Mis planos y sincronización"><span class="dot"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 18h10a4 4 0 00.6-7.95A6 6 0 006.1 9.2 4.5 4.5 0 007 18z"/></svg><span class="lbl" id="syncTxt">Planos</span></button>
 <button id="bImg" title="Ver el plano como imagen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg><span class="lbl">Imagen</span></button>
 <button id="bFile" title="Guardar, abrir o empezar de nuevo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg><span class="lbl">Archivo</span></button>
 <button id="bPanel" title="Mostrar u ocultar el panel" aria-label="Mostrar u ocultar el panel" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
@@ -168,6 +179,8 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 <p class="note" id="fMsg"></p>
 </form></dialog>
 
+<dialog id="dPlans"><form method="dialog"><div id="plansBody"></div><div class="row" style="margin-top:12px"><span class="sp"></span><button class="pri">Cerrar</button></div></form></dialog>
+<div id="toast" role="status" hidden></div>
 <dialog id="dImg"><form method="dialog">
 <h2>Imagen del plano</h2>
 <p class="note">Clic derecho (o mantén pulsado en el móvil) sobre la imagen y elige «Guardar imagen».</p>
@@ -244,7 +257,7 @@ d.items=d.items.filter(o=>o&&isFinite(o.x)&&isFinite(o.y)&&+o.w>0&&+o.h>0).map(o
 d.aisles=d.aisles.filter(a=>a&&Array.isArray(a.pts)&&a.pts.length>1).map(a=>({...a,id:String(a.id||uid()),name:String(a.name||'Pasillo'),w:+a.w>0?+a.w:2,pts:a.pts.map(q=>[+q[0]||0,+q[1]||0])}));
 return d;
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(doc))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(doc))}catch(e){}schedulePush()}
 function mut(fn){const b=JSON.stringify(doc);fn();if(JSON.stringify(doc)!==b){past.push(b);if(past.length>200)past.shift();future=[];save()}fixSel();render();queuePanel()}
 function fixSel(){if(sel&&!(sel.k==='i'?it(sel.id):ai(sel.id)))sel=null}
 function undo(){if(!past.length)return;future.push(JSON.stringify(doc));doc=JSON.parse(past.pop());fixSel();save();render();panel()}
@@ -677,7 +690,7 @@ render();
 function cycle(d){const seen=[];for(const el of document.elementsFromPoint(d.cx,d.cy)){const i=el.closest&&el.closest('[data-iid]'),a=el.closest&&el.closest('[data-aid]'),k=i?'i:'+i.dataset.iid:a?'a:'+a.dataset.aid:null;if(k&&!seen.includes(k))seen.push(k)}
 if(seen.length<2||!sel)return;const ix=seen.indexOf(sel.k+':'+sel.id),nx=seen[(ix+1)%seen.length].split(':');sel={k:nx[0],id:nx[1]};tab='props';ctxKey=''}
 function up(e){
-ptrs.delete(e.pointerId);
+ptrs.delete(e.pointerId);setTimeout(flushRemote,0);
 if(pinch){if(ptrs.size<2)pinch=null;drag=null;return}
 if(!drag)return;const d=drag;drag=null;
 if(d.k==='tap'){if(!d.moved){const w=tw(spt(e));if(mode==='aisle'){draft=draft||[];draft.push(draftPt(w))}else if(mode==='measure'){const q=snapPt(w).p;if(!meas||meas.b)meas={a:q,b:null};else meas.b=q}else if(d.cyc)cycle(d);else if(d.clear&&sel){sel=null;panel()}}render();return}
@@ -734,6 +747,78 @@ const stamp=()=>new Date().toISOString().slice(0,10);
 $('#bSave').onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(doc,null,1)],{type:'application/json'}));dl(`layout-nave-${stamp()}.json`,u);setTimeout(()=>URL.revokeObjectURL(u),4000);fMsg('Si no aparece la descarga, usa «Copiar» y pégalo en un archivo de texto.')};
 $('#bSaveImg').onclick=()=>{const s=$('#png').src;if(s)dl(`layout-nave-${stamp()}.png`,s)};
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)&&!/claude\.ai|claudeusercontent/.test(location.hostname)){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+/* sync (Firebase) */
+const CID=uid()+uid(),SDK='https://www.gstatic.com/firebasejs/10.12.2/',CKEY=KEY+'-cloud';
+let fb=null,user=null,layoutId=null,layoutName='',unsub=null,pushT=0,pendingRemote=null,firstSnap=true,toastT=0;
+const toast=t=>{const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3200)};
+const loadJs=src=>new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=ko;document.head.appendChild(s)});
+function setSync(st,msg){const b=$('#bSync');b.dataset.st=st;$('#syncTxt').textContent=msg;b.title=msg+(layoutName?' · '+layoutName:'')}
+const col=()=>fb.db.collection('users').doc(user.uid).collection('layouts');
+const fdate=ts=>{try{const d=ts&&ts.toDate?ts.toDate():null;return d?d.toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'ahora'}catch(e){return ''}};
+async function initSync(){
+const cfg=window.FIREBASE_CONFIG;if(!cfg||!/^https?:$/.test(location.protocol)){setSync('off','Planos');return}
+try{await loadJs(SDK+'firebase-app-compat.js');await Promise.all([loadJs(SDK+'firebase-auth-compat.js'),loadJs(SDK+'firebase-firestore-compat.js')])}catch(e){setSync('err','Sin conexión');return}
+try{firebase.initializeApp(cfg);fb={auth:firebase.auth(),db:firebase.firestore()};try{await fb.db.enablePersistence({synchronizeTabs:true})}catch(e){}}catch(e){setSync('err','Error de configuración');return}
+fb.auth.getRedirectResult().catch(()=>{});
+fb.auth.onAuthStateChanged(u=>{user=u;if(u)openInitial();else{stopListen();layoutId=null;layoutName='';setSync('out','Entrar')}});
+}
+async function signIn(){if(!fb)return;const pv=new firebase.auth.GoogleAuthProvider();try{await fb.auth.signInWithPopup(pv)}catch(e){if(/popup|operation-not-supported/i.test(e.code||''))fb.auth.signInWithRedirect(pv);else toast('No se pudo entrar: '+(e.code||e.message))}}
+function stopListen(){if(unsub){unsub();unsub=null}}
+async function openInitial(){
+let id=null;try{id=localStorage.getItem(CKEY)}catch(e){}
+if(id){const s=await col().doc(id).get().catch(()=>null);if(s&&s.exists){listen(id);return}}
+const q=await col().orderBy('updatedAt','desc').limit(50).get().catch(()=>null);
+if(!q||q.empty){await createPlan('Mi nave',doc,true);return}
+setSync('out','Elige plano');openPlans(true);
+}
+async function createPlan(name,data,silent){const r=col().doc();await r.set({name,data:JSON.stringify(data),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),cid:CID});listen(r.id);if(!silent)toast('Plano «'+name+'» creado');}
+function listen(id){
+if(pushT&&layoutId){clearTimeout(pushT);pushNow(layoutId)}
+stopListen();layoutId=id;firstSnap=true;try{localStorage.setItem(CKEY,id)}catch(e){}
+setSync('busy','Conectando…');
+unsub=col().doc(id).onSnapshot({includeMetadataChanges:true},snap=>{
+if(!snap.exists){if(layoutId===id){stopListen();layoutId=null;layoutName='';setSync('err','Plano borrado');openPlans(true)}return}
+const d=snap.data();layoutName=d.name||'Plano';
+if(snap.metadata.hasPendingWrites)setSync('busy','Guardando…');else setSync(snap.metadata.fromCache?'cache':'ok',snap.metadata.fromCache?'Sin conexión':'Sincronizado');
+const mine=JSON.stringify(doc);
+if(d.data&&d.data!==mine&&(firstSnap||d.cid!==CID)){pendingRemote={d,first:firstSnap};flushRemote()}
+firstSnap=false;
+},e=>setSync('err','Error: '+(e.code||'sin permiso')));
+}
+function flushRemote(){
+if(!pendingRemote||drag||pinch)return;const {d,first}=pendingRemote;pendingRemote=null;
+try{const parsed=JSON.parse(d.data);if(!valid(parsed))return;doc=normalize(parsed);past=[];future=[];try{localStorage.setItem(KEY,JSON.stringify(doc))}catch(e){}fixSel();if(first){fit()}render();queuePanel();if(!first)toast('Actualizado desde otro dispositivo')}catch(e){}
+}
+function pushNow(id){pushT=0;if(!id)return;col().doc(id).set({data:JSON.stringify(doc),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),cid:CID},{merge:true}).catch(e=>setSync('err','No se pudo guardar'))}
+function schedulePush(){if(!fb||!user||!layoutId)return;clearTimeout(pushT);setSync('busy','Guardando…');const id=layoutId;pushT=setTimeout(()=>pushNow(id),700)}
+async function openPlans(force){
+const body=$('#plansBody'),dlg=$('#dPlans');
+if(!window.FIREBASE_CONFIG||!/^https?:$/.test(location.protocol)){body.innerHTML=`<h2>Mis planos</h2><p class="note">La sincronización entre dispositivos funciona en la versión instalada desde GitHub Pages, cuando esté configurada. Aquí el plano se guarda solo en este dispositivo; para pasarlo a otro usa <b>Archivo → Guardar archivo .json</b>.</p>`}
+else if(!fb){body.innerHTML=`<h2>Mis planos</h2><p class="note">Conectando con la nube… Si no tienes conexión, sigue trabajando: el plano se guarda en este dispositivo.</p>`}
+else if(!user){body.innerHTML=`<h2>Mis planos</h2><p class="note">Entra con tu cuenta de Google para tener tus planos sincronizados en el PC, la tablet y el móvil. Cada cambio se guarda en la nube y aparece en los demás dispositivos en unos segundos.</p><button type="button" class="pri" data-p="in">Entrar con Google</button>`}
+else{body.innerHTML=`<h2>Mis planos</h2><p class="note">Cargando…</p>`;
+const q=await col().orderBy('updatedAt','desc').limit(100).get().catch(()=>null);const rows=q?q.docs:[];
+body.innerHTML=`<h2>Mis planos</h2><p class="note" style="margin-top:0">${force&&!layoutId?'En la nube ya tienes planos. Abre uno, o sube el plano que hay ahora en este dispositivo.':'Se sincronizan entre todos los dispositivos donde entres con esta cuenta.'}</p>
+<div class="row" style="margin-bottom:6px"><button type="button" data-p="up">Subir el plano de este dispositivo</button><button type="button" data-p="new">Nuevo vacío</button><button type="button" data-p="ex">Nuevo desde el ejemplo</button></div>
+${rows.map(r=>{const d=r.data(),cur=r.id===layoutId;return `<div class="pl${cur?' cur':''}"><div><div class="nm">${esc(d.name||'Plano')}${cur?' · abierto':''}</div><div class="dt2">Último cambio: ${esc(fdate(d.updatedAt))}</div></div><div class="row">${cur?'':`<button type="button" data-p="open" data-id="${esc(r.id)}">Abrir</button>`}<button type="button" data-p="ren" data-id="${esc(r.id)}" data-nm="${esc(d.name||'')}">Renombrar</button><button type="button" data-p="dup" data-id="${esc(r.id)}">Duplicar</button><button type="button" class="dng" data-p="del" data-id="${esc(r.id)}">Borrar</button></div></div>`}).join('')||'<p class="note">Todavía no hay planos en la nube.</p>'}
+<div id="plEdit"></div>
+<p class="note" style="margin-top:14px">Cuenta: ${esc(user.email||user.displayName||'')} · <button type="button" data-p="out" style="min-height:32px">Salir</button></p>
+<p class="note">Si dos dispositivos cambian el mismo plano a la vez, se queda el último cambio guardado. Para probar ideas sin estropear el original, usa «Duplicar».</p>`}
+if(!dlg.open)dlg.showModal();
+}
+$('#bSync').onclick=()=>openPlans(false);
+$('#plansBody').addEventListener('click',async e=>{const b=e.target.closest('[data-p]');if(!b)return;const a=b.dataset.p,id=b.dataset.id;
+if(a==='in')return signIn();
+if(a==='out'){await fb.auth.signOut();try{localStorage.removeItem(CKEY)}catch(er){}$('#dPlans').close();toast('Has salido. El plano sigue guardado en este dispositivo.');return}
+if(a==='up'){await createPlan('Plano del '+new Date().toLocaleDateString('es-ES'),doc);$('#dPlans').close();return}
+if(a==='new'){await createPlan('Plano nuevo',{...normalize(sample()),items:[],aisles:[]});$('#dPlans').close();return}
+if(a==='ex'){await createPlan('Ejemplo',sample());$('#dPlans').close();return}
+if(a==='open'){listen(id);$('#dPlans').close();return}
+if(a==='dup'){const s=await col().doc(id).get();const d=s.data();const r=col().doc();await r.set({name:(d.name||'Plano')+' (copia)',data:d.data,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),cid:CID});openPlans(false);return}
+if(a==='ren'){$('#plEdit').innerHTML=`<div class="sec"><label for="plN">Nuevo nombre<input id="plN" value="${esc(b.dataset.nm)}"></label><div class="row" style="margin-top:8px"><button type="button" class="pri" data-p="renok" data-id="${esc(id)}">Guardar nombre</button></div></div>`;$('#plN').focus();return}
+if(a==='renok'){const nm=$('#plN').value.trim();if(nm){await col().doc(id).set({name:nm},{merge:true});if(id===layoutId)layoutName=nm}openPlans(false);return}
+if(a==='del'){if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='¿Borrar del todo?';return}await col().doc(id).delete();if(id===layoutId){stopListen();layoutId=null;layoutName='';try{localStorage.removeItem(CKEY)}catch(er){}setSync('out','Elige plano')}toast('Plano borrado');openPlans(true);return}
+});
 /* start */
 function start(h){
 let d=valid(h)?h:null;
@@ -741,7 +826,7 @@ if(!d)try{const j=JSON.parse(localStorage.getItem(KEY));if(valid(j))d=j}catch(er
 doc=normalize(d||sample());
 try{window.claude?.hot?.snapshot?.(()=>doc)}catch(er){}
 if(wrap.clientWidth>0){fit();fitted=true}
-render();panel();
+render();panel();initSync();
 }
 const ro=new ResizeObserver(()=>{if(!doc)return;if(!fitted&&wrap.clientWidth>0){fit();fitted=true}render()});ro.observe(wrap);
 const hot=window.claude&&window.claude.hot;
