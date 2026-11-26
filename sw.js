@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que funcione sin conexión.
 // Primero intenta la red (para recibir actualizaciones) y, si no hay, usa la copia guardada.
-const CACHE = 'layout-nave-v4';
+const CACHE = 'layout-nave-v5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './favicon.png', './apple-touch-icon.png', './firebase-config.js'];
 
 self.addEventListener('install', e => {
