@@ -130,7 +130,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 </head>
 <body>
 <header>
-<h1>Layout de taller</h1>
+<h1 title="Versión 0.0.0">Layout de taller</h1>
 <div class="grp" role="group" aria-label="Herramienta">
 <button id="mSel" aria-pressed="true" title="Mover: solo arrastrar, sin cambiar tamaños (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 8-6 2-3 6z"/></svg><span class="lbl">Mover</span><kbd>V</kbd></button>
 <button id="mFree" aria-pressed="false" title="Diseño libre: mover, cambiar tamaño y girar (D)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"/><rect x="3" y="3" width="5" height="5" fill="currentColor" stroke="none"/><rect x="16" y="16" width="5" height="5" fill="currentColor" stroke="none"/></svg><span class="lbl">Diseño</span><kbd>D</kbd></button>
@@ -209,6 +209,7 @@ const $=s=>document.querySelector(s);
 const svg=$('#plan'),wrap=$('#wrap'),pn=$('#pn'),hud=$('#hud'),hint=$('#hint'),ctx=$('#ctx');
 const U={m:{f:1,d:2,l:'m'},cm:{f:100,d:0,l:'cm'},mm:{f:1000,d:0,l:'mm'},ft:{f:3.28084,d:2,l:'ft'}};
 const UN={m:'Metros',cm:'Centímetros',mm:'Milímetros',ft:'Pies'};
+const APP_VERSION='0.0.0';
 const KEY='layout-taller-v1';
 const LIGHT={paper:'#fbfcfd',g1:'#e8ecf0',g2:'#cfd6de',wall:'#17202a',muted:'#5b6673',ink:'#17202a',tape:'#e0a800',aisle:'#fbf1cf',acc:'#1d5fd1',panel:'#ffffff',warn:'#d93025',amber:'#c25e00'};
 const VARS={};for(const k in LIGHT)VARS[k]=`var(--${k})`;
@@ -669,7 +670,8 @@ ${nf('g_sz','Sección','',fN(.4))}<label class="chk" style="align-self:end;min-h
 <div class="sec"><h3>Tipos de elemento</h3>
 ${doc.types.map(t=>{const used=doc.items.some(o=>o.t===t.id),id=esc(t.id);return `<div class="ty"><input type="color" id="tc_${id}" data-ty="${id}" data-k="color" value="${esc(t.color)}" aria-label="Color de ${esc(t.name)}"><input id="tn_${id}" data-ty="${id}" data-k="name" value="${esc(t.name)}" aria-label="Nombre del tipo"><input id="tw_${id}" data-ty="${id}" data-k="w" inputmode="decimal" value="${fN(t.w)}" aria-label="Ancho por defecto" title="Ancho (${u})"><input id="th_${id}" data-ty="${id}" data-k="h" inputmode="decimal" value="${fN(t.h)}" aria-label="Fondo por defecto" title="Fondo (${u})"><div class="o"><label class="chk"><input type="checkbox" id="tz_${id}" data-ty="${id}" data-k="zone" ${t.zone?'checked':''}> Zona</label><label class="chk"><input type="checkbox" id="ts_${id}" data-ty="${id}" data-k="solid" ${t.solid?'checked':''}> Relleno (pilar)</label><button data-deltype="${id}" ${used?'disabled title="En uso"':''}>Borrar</button></div></div>`}).join('')}
 <div class="row" style="margin-top:10px"><button data-act="addType">Añadir tipo</button></div>
-<p class="note">Las dos casillas son el ancho y el fondo por defecto (${u}). El espacio de trabajo por defecto de cada tipo se fija desde una pieza con «Aplicar a todas». Un tipo «Zona» se dibuja rayado, debajo de todo, y no cuenta para los choques.</p></div>`}
+<p class="note">Las dos casillas son el ancho y el fondo por defecto (${u}). El espacio de trabajo por defecto de cada tipo se fija desde una pieza con «Aplicar a todas». Un tipo «Zona» se dibuja rayado, debajo de todo, y no cuenta para los choques.</p></div>
+<p class="note" style="margin-top:18px;text-align:center">Layout de nave industrial · versión ${APP_VERSION}</p>`}
 let pKey='';
 function panel(){
 NFD='';const fid=document.activeElement&&document.activeElement.id,key=tab+(sel?sel.k+sel.id:''),keep=key===pKey,st=pn.scrollTop;pKey=key;

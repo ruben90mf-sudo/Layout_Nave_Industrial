@@ -1,5 +1,7 @@
 # Layout de nave industrial
 
+**Versión 0.0.0** · App: https://ruben90mf-sudo.github.io/Layout_Nave_Industrial/
+
 Programa para organizar el layout de una nave industrial o un taller, a escala. Funciona en el navegador del PC, en tablets Android y en el móvil, y se puede instalar como app.
 
 ## Qué hace
@@ -41,3 +43,15 @@ Sin iniciar sesión, cada dispositivo guarda su propio plano. Para pasarlo a otr
 | `firebase-config.js` | Datos de conexión con Firebase (no son secretos) |
 | `firestore.rules` | Reglas de seguridad: cada usuario solo ve sus planos |
 | `icon-*.png`, `favicon.png`, `apple-touch-icon.png` | Iconos |
+
+## Versiones
+
+### 0.0.0 (26/11/2026)
+Primera versión estable:
+- Plano de la nave a escala con origen abajo a la izquierda, cuadrícula, cotas y herramienta de medir.
+- Elementos: mesas de trabajo, máquinas, estanterías, mesas supletorias, zonas de tarea, pilares (también en malla), salas o almacenes, puertas y portones.
+- Pasillos dibujados con líneas y espacio de trabajo alrededor de cada máquina.
+- Avisos de choques, pasillos invadidos y espacios de trabajo invadidos.
+- Modos Mover y Diseño libre; fijar todo el plano o por tipo.
+- Flujos de material: recorrido en escuadra (ΔX + ΔY), metros por pieza y al día, indicador de movimiento.
+- App instalable en PC y Android, funciona sin conexión y sincroniza los planos entre dispositivos con la cuenta de Google.
