@@ -48,7 +48,16 @@ body.nopanel aside{display:none}
 #plan{position:absolute;inset:0;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
 aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .tabs{display:flex;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;border:0;border-radius:0;border-bottom:3px solid transparent;background:none;justify-content:center;padding:0 4px;min-height:46px}
+.tabs button{flex:1 1 auto;border:0;border-radius:0;border-bottom:3px solid transparent;background:none;justify-content:center;padding:0 3px;min-height:46px;font-size:14px}
+#plan.flf g[data-iid],#plan.flf g[data-aid]{opacity:.5}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(7.5em,1fr));gap:8px;margin:10px 0}
+.big div{background:var(--soft);border-radius:8px;padding:8px 10px}
+.big b{display:block;font:700 22px/1.1 'Barlow Condensed',Barlow,sans-serif;white-space:nowrap}
+.big span{font-size:12px;color:var(--muted)}
+.mini{min-height:32px;padding:0 8px;font-size:14px}
+.lst .mini{width:auto;flex:none;border:1px solid var(--line);border-radius:7px;margin-left:6px}
+.lst .mini[aria-pressed=false]{color:var(--muted)}
+.lst .mini[aria-pressed=true]{background:var(--panel);color:var(--ink);border-color:var(--line)}
 .tabs button[aria-selected=true]{border-bottom-color:var(--acc);font-weight:700}
 .bd{color:#fff;border-radius:9px;font-size:12px;padding:0 6px;line-height:18px;background:var(--warn)}
 .bd.w{background:var(--amber)}
@@ -146,6 +155,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 <button data-v="snap" title="Ajustar a la cuadrícula al mover">Imán</button>
 <button data-v="dims" title="Cotas y ejes">Cotas</button>
 <button data-v="showCl" title="Espacios de trabajo alrededor de las máquinas">Espacios</button>
+<button data-v="showFlows" title="Mostrar los flujos de material">Flujos</button>
 <button data-v="lockAll" title="Fijar todo el plano para que no se mueva nada por error">Fijar todo</button>
 </div>
 <div id="hint"></div>
@@ -158,6 +168,7 @@ dialog img{max-width:100%;border:1px solid var(--line);background:#fff;display:b
 <button data-tab="add" role="tab">Añadir</button>
 <button data-tab="props" role="tab">Propiedades</button>
 <button data-tab="list" role="tab">Lista <span class="bd" id="warnN" hidden></span></button>
+<button data-tab="flows" role="tab">Flujos</button>
 <button data-tab="nave" role="tab">Nave</button>
 </div>
 <div id="pn"></div>
@@ -213,6 +224,7 @@ const TYPES=()=>[
 {id:'porton',name:'Portón',color:'#17202a',w:4,h:.25,door:'porton',cl:{f:2,b:0,l:0,r:0}}];
 
 let doc,past=[],future=[],sel=null,mode='select',tab='add',draft=null,meas=null,hov=null,drag=null,pinch=null,before='',fitted=false,pT=0,ctxKey='';
+let flowSel=null;const FCOL=['#d62f7a','#0f8a6c','#e07b00','#5b3fd1','#0d7fb8','#8a5a00'];
 let free=false;try{free=localStorage.getItem('layout-ui-free')==='1'}catch(e){}
 let CF={bad:new Map(),wc:new Map(),msgs:[]},view={s:20,ox:40,oy:40},ortho=true,draftW=2;
 const ptrs=new Map();
@@ -248,7 +260,9 @@ P('sup','Mesa supletoria 1',11,6.6,1.2,.6);P('sup','Mesa supletoria 2',21,11.2,1
 P('sala','Almacén de tornillería',25,9.7,4,2.6);P('sala','Almacén de EPIs',28.5,9.7,3,2.6);
 P('puerta','Puerta tornillería',25,10.94,.9,.2,180);P('puerta','Puerta EPIs',28.5,10.94,.9,.2,180);
 P('porton','Portón principal',0,12.5,4,.25,270);P('puerta','Puerta peatonal',26,18,.9,.2,180);
-return {v:3,unit:'m',grid:.1,snap:true,showGrid:true,dims:true,showCl:true,nave:{w:30,h:18},types:TYPES(),items,
+const byN=n=>(items.find(o=>o.name===n)||{}).id;
+const flows=[{id:uid(),name:'Pieza mecanizada',color:'#d62f7a',qty:20,steps:['Portón principal','Sierra de mesa','CNC','Mesa de trabajo 3','Zona de pintura','Zona de montaje','Estantería 2'].map(byN).filter(Boolean)}];
+return {v:4,unit:'m',grid:.1,snap:true,showGrid:true,dims:true,showCl:true,showFlows:true,flows,nave:{w:30,h:18},types:TYPES(),items,
 aisles:[{id:uid(),name:'Pasillo principal',w:2.5,pts:[[0,12.5],[30,12.5]]},{id:uid(),name:'Pasillo a pintura',w:2,pts:[[15,12.5],[15,6],[23,6]]}]};
 }
 function valid(d){return d&&typeof d==='object'&&d.nave&&Array.isArray(d.items)&&Array.isArray(d.aisles)&&Array.isArray(d.types)&&d.types.length}
@@ -257,7 +271,8 @@ function normalize(d){
 d.unit=U[d.unit]?d.unit:'m';d.grid=+d.grid>0?+d.grid:.1;
 d.nave={w:+d.nave.w>0?+d.nave.w:30,h:+d.nave.h>0?+d.nave.h:18};
 for(const k of ['snap','showGrid','dims','showCl'])if(typeof d[k]!=='boolean')d[k]=true;
-d.lockAll=!!d.lockAll;
+d.lockAll=!!d.lockAll;if(typeof d.showFlows!=='boolean')d.showFlows=true;
+d.flows=Array.isArray(d.flows)?d.flows.filter(f=>f&&Array.isArray(f.steps)).map((f,i)=>({id:String(f.id||uid()),name:String(f.name||'Flujo'),color:/^#[0-9a-f]{6}$/i.test(f.color)?f.color:FCOL[i%FCOL.length],qty:+f.qty>0?+f.qty:1,hidden:!!f.hidden,steps:f.steps.map(String)})):[];
 for(const bt of TYPES())if(['sala','puerta','porton'].includes(bt.id)&&!d.types.some(t=>t&&t.id===bt.id))d.types.push(bt);
 d.types=d.types.filter(t=>t&&t.id).map(t=>({...t,id:String(t.id),name:String(t.name||'Tipo'),color:/^#[0-9a-f]{6}$/i.test(t.color)?t.color:'#6b7280',w:+t.w>0?+t.w:1,h:+t.h>0?+t.h:1,cl:ncl(t.cl)}));
 d.items=d.items.filter(o=>o&&isFinite(o.x)&&isFinite(o.y)&&+o.w>0&&+o.h>0).map(o=>({...o,id:String(o.id||uid()),t:String(o.t),name:String(o.name||''),x:+o.x,y:+o.y,w:+o.w,h:+o.h,r:+o.r||0,cl:ncl(o.cl)}));
@@ -320,7 +335,7 @@ function snapPt(w,skip){
 let best=null,bd=12;const T=tm(),n=doc.nave;
 const test=(x,y)=>{const d=Math.hypot((x-w.x)*view.s,(y-w.y)*view.s);if(d<bd){bd=d;best=[x,y]}};
 for(const a of doc.aisles)a.pts.forEach((q,i)=>{if(!(skip&&skip.id===a.id&&skip.i===i))test(q[0],q[1])});
-for(const o of doc.items){if((T[o.t]||{}).solid)test(o.x,o.y);else corners(o).forEach(c=>test(c[0],c[1]))}
+for(const o of doc.items){test(o.x,o.y);if(!(T[o.t]||{}).solid)corners(o).forEach(c=>test(c[0],c[1]))}
 [[0,0],[n.w,0],[n.w,n.h],[0,n.h]].forEach(c=>test(c[0],c[1]));
 return best?{p:[r6(best[0]),r6(best[1])],v:true}:{p:[sn(w.x),sn(w.y)],v:false};
 }
@@ -333,7 +348,7 @@ text{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:600;pa
 .ae{stroke:${c.tape};fill:none}.af{stroke:${c.aisle};fill:none}.am{stroke:${c.tape};stroke-dasharray:8 6;fill:none;stroke-width:1}.at{fill:${c.ink};font-size:12px;stroke:${c.aisle}}
 .cota{stroke:${c.acc};stroke-width:1;fill:none}.ct{fill:${c.acc};font-size:12px}.sel{fill:none;stroke:${c.acc};stroke-width:1.5;stroke-dasharray:5 4}
 .hd{fill:${c.panel};stroke:${c.acc};stroke-width:1.5}.hm{fill:${c.acc};opacity:.55}.wn{fill:none;stroke:${c.warn};stroke-width:2.5;stroke-dasharray:5 3}.wc{stroke:${c.amber};stroke-width:2;stroke-dasharray:6 3}
-.org{fill:${c.acc}}.cota,.ct,.dim,.dt,.ax,.axl,.sel,.ms,.mt,.org{pointer-events:none}.lk rect{fill:${c.ink}}.lk path{fill:none;stroke:${c.paper};stroke-width:1.6}.dr{stroke:${c.ink};stroke-width:1.5;fill:none}.dl{fill:${c.ink};font-size:12px}.ms{stroke:${c.warn};stroke-width:1.5;fill:none}.mt{fill:${c.warn};font-size:14px}`}
+.org{fill:${c.acc}}.flt{font-size:13px;font-weight:700}.fln{fill:#fff;stroke:none;font-size:12px;font-weight:700}.cota,.ct,.dim,.dt,.ax,.axl,.sel,.ms,.mt,.org{pointer-events:none}.lk rect{fill:${c.ink}}.lk path{fill:none;stroke:${c.paper};stroke-width:1.6}.dr{stroke:${c.ink};stroke-width:1.5;fill:none}.dl{fill:${c.ink};font-size:12px}.ms{stroke:${c.warn};stroke-width:1.5;fill:none}.mt{fill:${c.warn};font-size:14px}`}
 function dimH(a,b,y,t,cl='dim',tc='dt'){return `<path class="${cl}" d="M${r1(a)} ${r1(y)}H${r1(b)}M${r1(a)} ${r1(y-5)}v10M${r1(b)} ${r1(y-5)}v10"/>`+(Math.abs(b-a)>t.length*6+6?`<text class="${tc}" x="${r1((a+b)/2)}" y="${r1(y-5)}" text-anchor="middle">${esc(t)}</text>`:'')}
 function dimV(a,b,x,t,cl='dim',tc='dt'){return `<path class="${cl}" d="M${r1(x)} ${r1(a)}V${r1(b)}M${r1(x-5)} ${r1(a)}h10M${r1(x-5)} ${r1(b)}h10"/>`+(Math.abs(b-a)>t.length*6+6?`<text class="${tc}" transform="translate(${r1(x-5)} ${r1((a+b)/2)}) rotate(-90)" text-anchor="middle">${esc(t)}</text>`:'')}
 function majorStep(S,min=24){for(const m of [.5,1,2,5,10,20,50])if(m>=doc.grid*4.99&&m*S>=min)return m;return 100}
@@ -412,6 +427,17 @@ function doorCotas(s,X,Y){const b=nearestSeg(s.x,s.y);if(!b||b.d>.05)return '';c
 if(Math.abs(b.uy)<1e-9){const y=Y(b.s.y1)+oy;if(t0>.005)o+=dimH(X(P(0)[0]),X(P(t0)[0]),y,fm(t0),'cota','ct');if(b.L-t1>.005)o+=dimH(X(P(t1)[0]),X(P(b.L)[0]),y,fm(b.L-t1),'cota','ct')}
 else if(Math.abs(b.ux)<1e-9){const x=X(b.s.x1)+ox;if(t0>.005)o+=dimV(Y(P(0)[1]),Y(P(t0)[1]),x,fm(t0),'cota','ct');if(b.L-t1>.005)o+=dimV(Y(P(t1)[1]),Y(P(b.L)[1]),x,fm(b.L-t1),'cota','ct')}
 return o}
+function legs(f){const out=[];let prev=null;for(const id of f.steps){const o=it(id);if(!o)continue;if(prev&&prev!==o){const dx=Math.abs(o.x-prev.x),dy=Math.abs(o.y-prev.y);out.push({a:prev,b:o,dx,dy,d:dx+dy})}prev=o}return out}
+function flowStats(f){const L=legs(f),sx=L.reduce((q,l)=>q+l.dx,0),sy=L.reduce((q,l)=>q+l.dy,0),d=sx+sy,st=f.steps.map(it).filter(Boolean),a=st[0],b=st[st.length-1],dir=a&&b?Math.abs(a.x-b.x)+Math.abs(a.y-b.y):0;return {L,sx,sy,d,day:d*f.qty,dir,fac:dir>1?d/dir:null}}
+function flowsSvg(v){if(!doc.showFlows)return '';const S=v.s,X=x=>x*S+v.ox,Y=y=>y*S+v.oy,vis=doc.flows.filter(f=>!f.hidden);let o='<g pointer-events="none">';
+vis.forEach((f,fi)=>{const off=(fi-(vis.length-1)/2)*5,col=esc(f.color),mid='ar_'+esc(f.id);
+o+=`<marker id="${mid}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+for(const l of legs(f)){const x1=X(l.a.x)+off,y1=Y(l.a.y)+off,x2=X(l.b.x)+off,y2=Y(l.b.y)+off;
+o+=`<path d="M${r1(x1)} ${r1(y1)}H${r1(x2)}V${r1(y2)}" fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" stroke-opacity=".9" marker-end="url(#${mid})"/>`;
+const t=fN(l.d)+' '+un().l;if(l.dx>=l.dy&&Math.abs(x2-x1)>t.length*6.4+8)o+=`<text class="flt" fill="${col}" x="${r1((x1+x2)/2)}" y="${r1(y1-6)}" text-anchor="middle">${esc(t)}</text>`;else if(Math.abs(y2-y1)>30)o+=`<text class="flt" fill="${col}" x="${r1(x2+7)}" y="${r1((y1+y2)/2+4)}">${esc(t)}</text>`}
+const nums=new Map();let k=0;for(const id of f.steps){k++;if(it(id)){if(!nums.has(id))nums.set(id,[]);nums.get(id).push(k)}}
+for(const [id,ns] of nums){const q=it(id),tx=ns.join(','),bw=Math.max(18,tx.length*7+8),cx=X(q.x)+off,cy=Y(q.y)+off;o+=`<rect x="${r1(cx-bw/2)}" y="${r1(cy-9)}" width="${r1(bw)}" height="18" rx="9" fill="${col}"/><text class="fln" x="${r1(cx)}" y="${r1(cy+4.5)}" text-anchor="middle">${esc(tx)}</text>`}});
+return o+'</g>'}
 function markup(v,W,H,exp){
 const T=tm(),n=doc.nave,S=v.s,X=x=>x*S+v.ox,Y=y=>y*S+v.oy;
 let o='<defs>';
@@ -443,6 +469,7 @@ for(const a of doc.aisles)o+=aisleSvg(a,v,exp);
 for(const i of rest.concat(doors))o+=clSvg(i,tt(i),v,exp);
 for(const i of rest)o+=itemSvg(i,tt(i),v,exp);
 for(const d of doors)o+=itemSvg(d,tt(d),v,exp);
+o+=flowsSvg(v);
 if(!exp&&doc.dims&&sel&&sel.k==='i'){const s=it(sel.id);if(s){const t=T[s.t]||{};
 if(t.door)o+=doorCotas(s,X,Y);
 else if(t.solid){if(s.x>.005)o+=dimH(X(0),X(s.x),Y(s.y),fm(s.x),'cota','ct');if(n.h-s.y>.005)o+=dimV(Y(s.y),Y(n.h),X(s.x),fm(n.h-s.y),'cota','ct')}
@@ -494,6 +521,7 @@ $('#mSel').setAttribute('aria-pressed',m==='select'&&!free);$('#mFree').setAttri
 function setTool(k){free=k==='free';try{localStorage.setItem('layout-ui-free',free?'1':'0')}catch(e){}setMode('select');toast(free?'Diseño libre: mover, cambiar tamaño y girar.':'Mover: solo arrastrar. Para cambiar tamaños, usa Diseño.')}
 function hintUp(){
 if(mode==='aisle'){hint.innerHTML=`<span>Haz clic para marcar los puntos del pasillo. Doble clic o <b>Terminar</b> para acabar.</span><label>Ancho <span class="ig"><input id="dw" type="text" inputmode="decimal" value="${fN(draftW)}"><span>${un().l}</span></span></label><label class="chk"><input id="dor" type="checkbox" ${ortho?'checked':''}> Solo rectas a 90°</label><button id="dOk" class="pri">Terminar</button><button id="dNo">Cancelar</button>`;hint.classList.add('on')}
+else if(mode==='flow'){const f=doc.flows.find(x=>x.id===flowSel);hint.innerHTML=`<span class="sw" style="background:${esc(f?f.color:'#888')}"></span><span>Toca los puestos en el orden que sigue el material: <b>${esc(f?f.name:'')}</b> (${f?f.steps.length:0} pasos).</span><button id="fUndo" ${f&&f.steps.length?'':'disabled'}>Quitar último</button><button id="dNo" class="pri">Terminar</button>`;hint.classList.add('on')}
 else if(mode==='measure'){hint.innerHTML=`<span>Marca dos puntos. Se ajusta a esquinas, pilares, pasillos y a la cuadrícula.</span><button id="dNo">Salir</button>`;hint.classList.add('on')}
 else hint.classList.remove('on');
 }
@@ -540,7 +568,7 @@ const nf=(id,label,attr,val,unit)=>`<label for="${id}">${label}<span class="ig">
 function warnFor(id){const m=CF.msgs.filter(x=>x.id===id);return m.length?`<ul class="lst">${m.map(x=>`<li><button class="${x.lv}" data-sel="i:${esc(x.id)}">${esc(x.txt)}</button></li>`).join('')}</ul>`:''}
 function pAdd(){const u=un().l;return `<h2>Añadir elemento</h2><p class="note" style="margin-top:0">Aparece en el centro de la vista, listo para arrastrarlo a su sitio.</p><div class="addg">${doc.types.map(t=>`<button data-add="${esc(t.id)}"><span class="row" style="gap:6px;flex-wrap:nowrap"><span class="sw" style="background:${esc(t.color)}"></span><b>${esc(t.name)}</b></span><span class="note" style="margin:0">${fN(t.w)} × ${fN(t.h)} ${u}${t.cl&&(t.cl.f||t.cl.b||t.cl.l||t.cl.r)?' · con espacio':''}</span></button>`).join('')}
 <button data-act="aisle"><span class="row" style="gap:6px"><span class="sw" style="background:var(--tape)"></span><b>Pasillo</b></span><span class="note" style="margin:0">Dibujar con líneas</span></button></div>
-<div class="sec"><h3>Cómo se usa</h3><ul class="note"><li><b>Mover</b> (V): solo arrastra; no cambia tamaños ni gira. Ideal para recolocar sin estropear nada.</li><li><b>Diseño</b> (D): además, cuadrados de las esquinas para cambiar el tamaño y círculo de arriba para girar.</li><li>Si hay varias cosas una encima de otra (por ejemplo, una máquina dentro de una zona), toca otra vez en el mismo sitio para seleccionar la de debajo.</li><li>Para que nada se mueva por error: botón <b>Fijar todo</b> sobre el plano, o fija por tipo (pilares, salas, puertas…) en la pestaña <b>Nave</b>. También puedes bloquear un elemento suelto desde la barra que aparece al seleccionarlo. Lo bloqueado lleva un candado.</li><li>La línea gruesa marca el frente de trabajo; el rectángulo discontinuo es el espacio de trabajo.</li><li>Al seleccionar, las cotas azules dan la distancia libre hasta lo más cercano (otro elemento, un pasillo o la pared).</li><li>Puertas y portones se pegan a la pared más cercana, de la nave o de una sala.</li><li>Las salas (almacén de tornillería, EPIs…) tienen paredes y quedan fuera del espacio de trabajo del taller.</li><li>El origen (0, 0) es la esquina inferior izquierda.</li></ul></div>
+<div class="sec"><h3>Cómo se usa</h3><ul class="note"><li><b>Mover</b> (V): solo arrastra; no cambia tamaños ni gira. Ideal para recolocar sin estropear nada.</li><li><b>Diseño</b> (D): además, cuadrados de las esquinas para cambiar el tamaño y círculo de arriba para girar.</li><li>Si hay varias cosas una encima de otra (por ejemplo, una máquina dentro de una zona), toca otra vez en el mismo sitio para seleccionar la de debajo.</li><li>Para que nada se mueva por error: botón <b>Fijar todo</b> sobre el plano, o fija por tipo (pilares, salas, puertas…) en la pestaña <b>Nave</b>. También puedes bloquear un elemento suelto desde la barra que aparece al seleccionarlo. Lo bloqueado lleva un candado.</li><li>La línea gruesa marca el frente de trabajo; el rectángulo discontinuo es el espacio de trabajo.</li><li>Al seleccionar, las cotas azules dan la distancia libre hasta lo más cercano (otro elemento, un pasillo o la pared).</li><li><b>Flujos</b>: en la pestaña Flujos, crea un flujo y toca los puestos en el orden que sigue el material. Verás el recorrido con flechas y los metros.</li><li>Puertas y portones se pegan a la pared más cercana, de la nave o de una sala.</li><li>Las salas (almacén de tornillería, EPIs…) tienen paredes y quedan fuera del espacio de trabajo del taller.</li><li>El origen (0, 0) es la esquina inferior izquierda.</li></ul></div>
 <div class="sec"><h3>Atajos de teclado</h3><ul class="note"><li>Flechas: mover (con Mayús, ×10)</li><li>R: girar 90° · Supr: borrar · Ctrl+D: duplicar</li><li>Ctrl+Z / Ctrl+Y: deshacer / rehacer</li><li>V: mover · P: pasillo · M: medir · Esc: salir</li></ul></div>`}
 const clSvgIcon=`<svg viewBox="0 0 100 74" aria-hidden="true"><rect x="3" y="3" width="94" height="62" rx="3" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".6"/><rect x="24" y="18" width="52" height="30" rx="2" fill="color-mix(in srgb,var(--acc) 18%,transparent)" stroke="var(--acc)" stroke-width="1.5"/><path d="M38 44.5h24" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="62" r="4" fill="var(--ink)"/><path d="M50 57v-4" stroke="var(--ink)" stroke-width="1.5"/></svg>`;
 function pProps(){
@@ -602,6 +630,26 @@ return `<h2>Resumen</h2><table><thead><tr><th>Tipo</th><th class="n">Uds.</th><t
 <p class="note">En rojo, elementos que chocan o invaden un pasillo. En naranja, espacios de trabajo invadidos. Dos espacios de trabajo pueden compartir sitio sin aviso.</p></div>
 <div class="sec"><h3>Elementos</h3><ul class="lst">${items.map(o=>`<li><button data-sel="i:${esc(o.id)}"><span class="sw" style="background:${esc((T[o.t]||{}).color||'#888')}"></span>${esc(o.name)}<span class="dm">${fN(o.w)} × ${fN(o.h)}</span></button></li>`).join('')}${doc.aisles.map(a=>`<li><button data-sel="a:${esc(a.id)}"><span class="sw" style="background:var(--tape)"></span>${esc(a.name)}<span class="dm">ancho ${fN(a.w)}</span></button></li>`).join('')}</ul></div>`;
 }
+function pFlows(){
+const u=un().l;
+const how=`<div class="sec"><h3>Cómo se mide</h3><p class="note" style="margin-top:0">Cada tramo va del centro de un puesto al centro del siguiente y se mide en escuadra: <b>ΔX + ΔY</b>, como se mueve el material por los pasillos. Para comprobar un tramo, usa <b>Medir</b> entre los dos centros (se ajusta a ellos) y suma Δx + Δy.</p></div>`;
+if(!doc.flows.length)return `<h2>Flujos de material</h2><p class="note">Un flujo es el camino que sigue el material por el taller, de puesto en puesto y en orden. Sirve para ver de un vistazo si el material se mueve demasiado.</p><button class="pri" data-fl="new">Nuevo flujo</button>${how}`;
+const all=doc.flows.reduce((q,f)=>q+flowStats(f).day,0);
+let h=`<h2>Flujos de material</h2><div class="big"><div><b>${fm(all)}</b><span>al día, todos los flujos</span></div></div><p class="note" style="margin-top:0">Para comparar distribuciones: en <b>Planos</b> duplica el plano, mueve los puestos y mira cómo cambia esta cifra.</p>
+<ul class="lst">${doc.flows.map(f=>{const st=flowStats(f);return `<li style="display:flex;align-items:center"><button data-fl="sel" data-id="${esc(f.id)}" style="flex:1${f.id===flowSel?';font-weight:700':''}"><span class="sw" style="background:${esc(f.color)}"></span>${esc(f.name)}<span class="dm">${fm(st.d)} / pieza</span></button><button class="mini" data-fl="eye" data-id="${esc(f.id)}" aria-pressed="${!f.hidden}" title="Mostrar u ocultar en el plano">${f.hidden?'Oculto':'Visible'}</button></li>`}).join('')}</ul>
+<div class="row" style="margin-top:8px"><button data-fl="new">Nuevo flujo</button></div>`;
+const f=doc.flows.find(x=>x.id===flowSel);
+if(f){const st=flowStats(f);let prev=null,k=0;
+const rows=f.steps.map((id,i)=>{const o=it(id);let d='';if(o){if(prev&&prev!==o)d=fm(Math.abs(o.x-prev.x)+Math.abs(o.y-prev.y));prev=o}return `<tr><td class="n">${i+1}</td><td>${o?esc(o.name):'<span class="note">(puesto borrado)</span>'}</td><td class="n">${d}</td><td class="n" style="white-space:nowrap"><button class="mini" data-fl="up" data-i="${i}" ${i?'':'disabled'} aria-label="Subir">↑</button> <button class="mini" data-fl="dn" data-i="${i}" ${i<f.steps.length-1?'':'disabled'} aria-label="Bajar">↓</button> <button class="mini dng" data-fl="rm" data-i="${i}" aria-label="Quitar">✕</button></td></tr>`}).join('');
+const lvl=st.fac===null?'':st.fac<=1.5?'Recorrido directo.':st.fac<=3?'Hay vueltas: revisable.':'El material se mueve mucho.';
+h+=`<div class="sec"><h3>${esc(f.name)}</h3>
+<div class="f"><label class="full" for="fl_name">Nombre<input id="fl_name" data-flf="name" value="${esc(f.name)}"></label><label for="fl_col">Color<input type="color" id="fl_col" data-flf="color" value="${esc(f.color)}"></label>${nf('fl_qty','Piezas al día','data-flf="qty"',f.qty,'uds.')}</div>
+<div class="row" style="margin:12px 0"><button class="pri" data-fl="pick">${mode==='flow'?'Terminar de añadir pasos':'Añadir pasos tocando el plano'}</button></div>
+${f.steps.length?`<table><thead><tr><th class="n">#</th><th>Puesto</th><th class="n">Tramo</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="note">Sin pasos todavía. Pulsa el botón azul y toca los puestos en el orden que sigue el material.</p>'}
+${st.L.length?`<div class="big"><div><b>${fm(st.d)}</b><span>por pieza (X ${fN(st.sx)} + Y ${fN(st.sy)})</span></div><div><b>${fm(st.day)}</b><span>al día (× ${f.qty} ${f.qty===1?'ud.':'uds.'})</span></div>${st.fac!==null?`<div><b>× ${st.fac.toLocaleString('es-ES',{maximumFractionDigits:1})}</b><span>la distancia directa entrada→salida (${fm(st.dir)})</span></div>`:''}</div>
+${lvl?`<p class="note" style="color:var(--ink)"><b>${lvl}</b> Orientativo: hasta ×1,5 es un recorrido directo; más de ×3, el material va y vuelve.</p>`:'<p class="note">La entrada y la salida están en el mismo sitio, así que no hay distancia directa para comparar.</p>'}`:''}
+<div class="row" style="margin-top:12px"><button data-fl="dup">Duplicar flujo</button><button class="dng" data-fl="del">Eliminar flujo</button></div></div>`}
+return h+how}
 function pNave(){const u=un().l;
 return `<h2>Nave</h2><p class="note" style="margin-top:0">Origen (0, 0) en la esquina inferior izquierda. X hacia la derecha, Y hacia arriba.</p><div class="f">
 ${nf('n_w','Largo (eje X)','data-n="w"',fN(doc.nave.w))}${nf('n_h','Ancho (eje Y)','data-n="h"',fN(doc.nave.h))}
@@ -626,7 +674,7 @@ let pKey='';
 function panel(){
 NFD='';const fid=document.activeElement&&document.activeElement.id,key=tab+(sel?sel.k+sel.id:''),keep=key===pKey,st=pn.scrollTop;pKey=key;
 document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
-pn.innerHTML=tab==='add'?pAdd():tab==='props'?pProps():tab==='list'?pList():pNave();
+pn.innerHTML=tab==='add'?pAdd():tab==='props'?pProps():tab==='list'?pList():tab==='flows'?pFlows():pNave();svg.classList.toggle('flf',tab==='flows');
 if(fid){const el=document.getElementById(fid);if(el&&pn.contains(el))el.focus({preventScroll:true})}
 pn.scrollTop=keep?st:0;
 }
@@ -648,17 +696,19 @@ else if(d.c&&sel){const o=it(sel.id),q=pr(v);if(o&&!LK(o))mut(()=>{if(q!==null&&
 else if(d.a&&sel){const a=ai(sel.id);if(LK(a)&&d.a==='w'){queuePanel();return}mut(()=>{if(d.a==='name')a.name=v.trim()||a.name;else if(d.a==='w'){const q=pr(v);if(q>0)a.w=r6(q)}else a.lock=!!v})}
 else if(d.seg!==undefined&&sel){const a=ai(sel.id),i=+d.seg,q=pr(v);if(LK(a)){queuePanel();return}mut(()=>{const p=a.pts,L=Math.hypot(p[i+1][0]-p[i][0],p[i+1][1]-p[i][1]);if(q>0&&L>0){const dx=(p[i+1][0]-p[i][0])/L*(q-L),dy=(p[i+1][1]-p[i][1])/L*(q-L);for(let j=i+1;j<p.length;j++){p[j][0]=r6(p[j][0]+dx);p[j][1]=r6(p[j][1]+dy)}}})}
 else if(d.n){mut(()=>{const k=d.n;if(k==='unit')doc.unit=v;else{const q=pr(v);if(q>0){if(k==='grid')doc.grid=r6(q);else if(k==='w')doc.nave.w=r6(q);else{const dl=q-doc.nave.h;doc.items.forEach(o=>o.y=r6(o.y+dl));doc.aisles.forEach(a=>a.pts.forEach(p=>p[1]=r6(p[1]+dl)));doc.nave.h=r6(q)}}}});if(d.n==='unit')hintUp();if(d.n==='w'||d.n==='h'){fit();render()}}
+else if(d.flf){const f=doc.flows.find(x=>x.id===flowSel);if(f)mut(()=>{if(d.flf==='name')f.name=v.trim()||f.name;else if(d.flf==='color')f.color=v;else{const q=parseFloat(String(v).replace(',','.'));if(q>0)f.qty=q}})}
 else if(d.lkall){doc.lockAll=!!v;save();ctxKey='';render();queuePanel()}
 else if(d.lt){mut(()=>{if(d.lt==='__a')doc.aisles.forEach(a=>a.lock=!!v);else doc.items.forEach(o=>{if(o.t===d.lt)o.lock=!!v})})}
 else if(d.ty){const t=doc.types.find(x=>x.id===d.ty);if(t)mut(()=>{const k=d.k;if(k==='w'||k==='h'){const q=pr(v);if(q>0)t[k]=r6(q)}else if(k==='name')t.name=v.trim()||t.name;else if(k==='color')t.color=v;else t[k]=!!v})}
 });
 pn.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+if(b.dataset.fl){flowAct(b);return}
 if(b.dataset.add)addItem(b.dataset.add);
 else if(b.dataset.sel){const [k,id]=b.dataset.sel.split(':');sel={k,id};tab='props';render();panel()}
 else if(b.dataset.deltype)mut(()=>{doc.types=doc.types.filter(t=>t.id!==b.dataset.deltype)});
 else if(b.dataset.act)act(b.dataset.act);
 });
-document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;if(document.body.classList.contains('nopanel')){document.body.classList.remove('nopanel');$('#bPanel').setAttribute('aria-pressed','true')}panel()}});
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;if(mode==='flow'&&tab!=='flows')setMode('select');if(document.body.classList.contains('nopanel')){document.body.classList.remove('nopanel');$('#bPanel').setAttribute('aria-pressed','true')}panel()}});
 ctx.addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;const c=b.dataset.c;if(c==='rl')rotBy(-90);else if(c==='rr')rotBy(90);else if(c==='dup')dup();else if(c==='lock')toggleLock();else if(c==='del')del();else if(c==='flip')flipDoor();else if(c==='unall'){doc.lockAll=false;save();queuePanel()}ctxKey=''; render()});
 $('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;const k=b.dataset.v;doc[k]=!doc[k];save();ctxKey='';render();queuePanel();if(k==='lockAll')toast(doc.lockAll?'Plano fijado: nada se puede mover, girar ni borrar.':'Plano desbloqueado.')});
 
@@ -705,13 +755,27 @@ else if(k==='vx'){const a=ai(sel.id);a.pts[drag.i]=snapPt(w,{id:a.id,i:drag.i}).
 else if(k==='am'){const a=ai(sel.id),dx=sn(w.x-drag.w0.x),dy=sn(w.y-drag.w0.y);a.pts=drag.p0.map(q=>[r6(q[0]+dx),r6(q[1]+dy)])}
 render();
 });
+function flowAct(b){const a=b.dataset.fl,f=doc.flows.find(x=>x.id===flowSel);
+if(a==='new'){const n={id:uid(),name:'Flujo '+(doc.flows.length+1),color:FCOL[doc.flows.length%FCOL.length],qty:1,hidden:false,steps:[]};mut(()=>doc.flows.push(n));flowSel=n.id;setMode('flow');queuePanel();return}
+if(a==='sel'){flowSel=b.dataset.id===flowSel&&mode!=='flow'?null:b.dataset.id;if(mode==='flow')setMode('select');panel();return}
+if(a==='eye'){const g=doc.flows.find(x=>x.id===b.dataset.id);if(g)mut(()=>g.hidden=!g.hidden);return}
+if(!f)return;const i=+b.dataset.i;
+if(a==='pick'){setMode(mode==='flow'?'select':'flow');panel();return}
+if(a==='up'&&i>0)mut(()=>{const s=f.steps;[s[i-1],s[i]]=[s[i],s[i-1]]});
+else if(a==='dn'&&i<f.steps.length-1)mut(()=>{const s=f.steps;[s[i+1],s[i]]=[s[i],s[i+1]]});
+else if(a==='rm')mut(()=>f.steps.splice(i,1));
+else if(a==='dup'){const c={...clone(f),id:uid(),name:f.name+' (copia)'};mut(()=>doc.flows.push(c));flowSel=c.id}
+else if(a==='del'){if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='¿Eliminar de verdad?';return}mut(()=>{doc.flows=doc.flows.filter(x=>x.id!==f.id)});flowSel=null;if(mode==='flow')setMode('select')}
+}
+function addStep(cx,cy){const f=doc.flows.find(x=>x.id===flowSel);if(!f)return;let id=null;for(const el of document.elementsFromPoint(cx,cy)){const g=el.closest&&el.closest('[data-iid]');if(g){id=g.dataset.iid;break}}
+if(!id){toast('Toca una máquina, mesa, zona, sala o puerta.');return}if(f.steps[f.steps.length-1]===id)return;mut(()=>f.steps.push(id));hintUp()}
 function cycle(d){const seen=[];for(const el of document.elementsFromPoint(d.cx,d.cy)){const i=el.closest&&el.closest('[data-iid]'),a=el.closest&&el.closest('[data-aid]'),k=i?'i:'+i.dataset.iid:a?'a:'+a.dataset.aid:null;if(k&&!seen.includes(k))seen.push(k)}
 if(seen.length<2||!sel)return;const ix=seen.indexOf(sel.k+':'+sel.id),nx=seen[(ix+1)%seen.length].split(':');sel={k:nx[0],id:nx[1]};tab='props';ctxKey=''}
 function up(e){
 ptrs.delete(e.pointerId);setTimeout(flushRemote,0);
 if(pinch){if(ptrs.size<2)pinch=null;drag=null;return}
 if(!drag)return;const d=drag;drag=null;
-if(d.k==='tap'){if(!d.moved){const w=tw(spt(e));if(mode==='aisle'){draft=draft||[];draft.push(draftPt(w))}else if(mode==='measure'){const q=snapPt(w).p;if(!meas||meas.b)meas={a:q,b:null};else meas.b=q}else if(d.cyc)cycle(d);else if(d.clear&&sel){sel=null;panel()}}render();return}
+if(d.k==='tap'){if(!d.moved){const w=tw(spt(e));if(mode==='aisle'){draft=draft||[];draft.push(draftPt(w))}else if(mode==='flow'){addStep(e.clientX,e.clientY)}else if(mode==='measure'){const q=snapPt(w).p;if(!meas||meas.b)meas={a:q,b:null};else meas.b=q}else if(d.cyc)cycle(d);else if(d.clear&&sel){sel=null;panel()}}render();return}
 if(JSON.stringify(doc)!==before){past.push(before);if(past.length>200)past.shift();future=[];save()}else if(d.cyc)cycle(d);
 render();panel();
 }
@@ -742,7 +806,7 @@ $('#bPanel').onclick=()=>{const off=document.body.classList.toggle('nopanel');$(
 $('#zIn').onclick=()=>zoomAt({x:wrap.clientWidth/2,y:wrap.clientHeight/2},1.25);
 $('#zOut').onclick=()=>zoomAt({x:wrap.clientWidth/2,y:wrap.clientHeight/2},.8);
 $('#zFit').onclick=()=>{fit();render()};
-hint.addEventListener('click',e=>{const id=e.target.id;if(id==='dOk')finishDraft();else if(id==='dNo')setMode('select')});
+hint.addEventListener('click',e=>{const id=e.target.closest('button')?.id;if(id==='dOk')finishDraft();else if(id==='dNo'){setMode('select');queuePanel()}else if(id==='fUndo'){const f=doc.flows.find(x=>x.id===flowSel);if(f&&f.steps.length)mut(()=>f.steps.pop());hintUp()}});
 hint.addEventListener('change',e=>{if(e.target.id==='dw'){const v=pr(e.target.value);if(v>0)draftW=r6(v);e.target.value=fN(draftW);render()}else if(e.target.id==='dor')ortho=e.target.checked});
 const fMsg=t=>$('#fMsg').textContent=t;
 $('#bFile').onclick=()=>{$('#json').value=JSON.stringify(doc,null,1);fMsg('');$('#dFile').showModal()};
